@@ -16,7 +16,10 @@ import (
 	"github.com/cemc-oper/orvix/internal/script"
 )
 
-var submitDryRun bool
+var (
+	submitDryRun    bool
+	submitScheduler string
+)
 
 var submitCmd = &cobra.Command{
 	Use:   "submit [flags] <script>",
@@ -37,7 +40,7 @@ success.`,
 			return fmt.Errorf("read script: %w", err)
 		}
 
-		directives, err := directive.Parse(src)
+		directives, err := directive.ParseWithOverride(src, submitScheduler)
 		if err != nil {
 			return fmt.Errorf("parse directives: %w", err)
 		}
@@ -126,5 +129,6 @@ func usernameOrEmpty() string {
 
 func init() {
 	submitCmd.Flags().BoolVar(&submitDryRun, "dry-run", false, "Print the generated script and exit without submitting")
+	submitCmd.Flags().StringVar(&submitScheduler, "scheduler", "", "Override the scheduler (slurm, local, etc.)")
 	rootCmd.AddCommand(submitCmd)
 }

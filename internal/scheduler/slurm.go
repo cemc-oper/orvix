@@ -14,19 +14,50 @@ type SLURM struct{}
 
 func (s *SLURM) Name() string { return "slurm" }
 
-// PreambleFor translates orvix key=value directives to #SBATCH lines using
-// long-flag form: `#SBATCH --key=value`. Bare keys (empty value) emit
-// `#SBATCH --key`. Values containing whitespace are double-quoted.
+// slurmFlag maps every orvix generic directive name to its SLURM long-flag
+// name. An empty value means the directive has no SLURM equivalent and is
+// silently skipped. Entries whose key and value are identical are listed
+// explicitly for clarity and auditability.
+var slurmFlag = map[string]string{
+	"scheduler":       "",              // consumed by orvix
+	"job-name":        "job-name",      // --job-name
+	"output":          "output",        // --output
+	"error":           "error",         // --error
+	"nodes":           "nodes",         // --nodes
+	"ntasks":          "ntasks",        // --ntasks
+	"ntasks-per-node": "ntasks-per-node", // --ntasks-per-node
+	"cpus-per-task":   "cpus-per-task", // --cpus-per-task
+	"time":            "time",          // --time
+	"partition":       "partition",     // --partition
+	"account":         "account",       // --account
+	"project":         "wckey",         // --wckey
+	"application":     "comment",       // --comment
+	"exclusive":       "exclusive",     // --exclusive
+	"nodelist":        "nodelist",      // --nodelist
+	"job-type":        "",              // no SLURM equivalent
+	"memory":          "mem",           // --mem
+	"dependency":      "dependency",    // --dependency
+}
+
+// PreambleFor translates orvix generic directives to #SBATCH lines.
+//
+// Each known directive is mapped via slurmFlag (e.g. project -> --wckey).
+// Directives with no SLURM equivalent (job-type) are silently skipped.
+// Bare keys emit #SBATCH --flag; values with whitespace are double-quoted.
 func (s *SLURM) PreambleFor(d *directive.Set) ([]string, error) {
 	var lines []string
 	for _, item := range d.Items {
-		if item.Key == "scheduler" {
-			continue
+		flag := item.Key
+		if mapped, ok := slurmFlag[item.Key]; ok {
+			if mapped == "" {
+				continue // skip directives with no SLURM equivalent
+			}
+			flag = mapped
 		}
 		if item.Value == "" {
-			lines = append(lines, fmt.Sprintf("#SBATCH --%s", item.Key))
+			lines = append(lines, fmt.Sprintf("#SBATCH --%s", flag))
 		} else {
-			lines = append(lines, fmt.Sprintf("#SBATCH --%s=%s", item.Key, slurmQuote(item.Value)))
+			lines = append(lines, fmt.Sprintf("#SBATCH --%s=%s", flag, slurmQuote(item.Value)))
 		}
 	}
 	return lines, nil

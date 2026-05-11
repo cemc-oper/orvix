@@ -12,13 +12,40 @@ import (
 const Marker = "#ORVIX"
 
 // Directive is one parsed `#ORVIX key=value` (or bare `#ORVIX key`) line.
+// Conditional directives carry ConditionKey/ConditionValue (e.g. scheduler=slurm).
+// Empty ConditionKey means unconditional.
 type Directive struct {
-	Key   string
-	Value string // empty for bare keys
-	Line  int
+	Key            string
+	Value          string // empty for bare keys
+	Line           int
+	ConditionKey   string // e.g. "scheduler"; empty means unconditional
+	ConditionValue string // e.g. "slurm"
 }
 
-// Set is the parsed collection of directives, indexed by key for quick lookup.
+// KnownDirectives is the canonical set of orvix generic directives.
+// Any directive whose key is not in this set is silently discarded during parsing.
+var KnownDirectives = map[string]bool{
+	"scheduler":       true,
+	"job-name":        true,
+	"output":          true,
+	"error":           true,
+	"nodes":           true,
+	"ntasks":          true,
+	"ntasks-per-node": true,
+	"cpus-per-task":   true,
+	"time":            true,
+	"partition":       true,
+	"account":         true,
+	"project":         true,
+	"application":     true,
+	"exclusive":       true,
+	"nodelist":        true,
+	"job-type":        true,
+	"memory":          true,
+	"dependency":      true,
+}
+
+// Set is the parsed collection of known directives, indexed by key for quick lookup.
 type Set struct {
 	Items []Directive
 	byKey map[string]string
@@ -62,22 +89,22 @@ func IsDirectiveLine(line string) bool {
 	return rest == "" || rest[0] == ' ' || rest[0] == '\t'
 }
 
-// Parse extracts `#ORVIX ...` directives from a script header.
-//
-// Each directive line carries a single key=value pair, or a bare key for flags
-// without values:
-//
-//	#ORVIX scheduler=slurm
-//	#ORVIX partition=gpu
-//	#ORVIX nodes=2
-//	#ORVIX comment="long running benchmark"
-//	#ORVIX exclusive                          (bare key, no value)
-//
-// Parsing stops at the first non-blank, non-comment line.
+// Parse extracts `#ORVIX ...` directives from a script header using the
+// scheduler specified in the script (defaulting to "local"). It is a
+// convenience wrapper for ParseWithOverride with an empty override.
 func Parse(src []byte) (*Set, error) {
-	set := &Set{byKey: make(map[string]string)}
+	return ParseWithOverride(src, "")
+}
+
+// ParseWithOverride extracts directives and resolves conditional filtering using
+// schedulerOverride when non-empty, otherwise falling back to the script's own
+// scheduler= directive. The override value is also written into the returned
+// Set so that Scheduler() and downstream consumers see the overridden value.
+func ParseWithOverride(src []byte, schedulerOverride string) (*Set, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(src))
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	var raw []Directive
 
 	lineNo := 0
 	for scanner.Scan() {
@@ -106,19 +133,94 @@ func Parse(src []byte) (*Set, error) {
 		if body == "" {
 			continue
 		}
+		if strings.HasPrefix(body, "[") && !strings.Contains(body, "]") {
+			return nil, fmt.Errorf("line %d: unclosed [ in condition", lineNo)
+		}
+
+		condKey, condValue, body := splitCondition(body)
+		if body == "" {
+			continue
+		}
 
 		dir, err := parseDirective(body)
 		if err != nil {
 			return nil, fmt.Errorf("line %d: %w", lineNo, err)
 		}
 		dir.Line = lineNo
-		set.Items = append(set.Items, dir)
-		set.byKey[dir.Key] = dir.Value
+		dir.ConditionKey = condKey
+		dir.ConditionValue = condValue
+		raw = append(raw, dir)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
+
+	// Determine scheduler: override takes precedence.
+	sched := schedulerOverride
+	if sched == "" {
+		for _, dir := range raw {
+			if dir.Key == "scheduler" && dir.ConditionKey == "" {
+				sched = dir.Value
+				break
+			}
+		}
+	}
+	if sched == "" {
+		sched = "local"
+	}
+
+	// Filter by condition and known-directive set, then build the final Set.
+	set := &Set{byKey: make(map[string]string)}
+	for _, dir := range raw {
+		if dir.ConditionKey != "" && (dir.ConditionKey != "scheduler" || dir.ConditionValue != sched) {
+			continue // skip conditionally excluded directives
+		}
+		if !KnownDirectives[dir.Key] {
+			continue // skip unknown directives (no backward-compatible passthrough)
+		}
+		set.Items = append(set.Items, dir)
+		set.byKey[dir.Key] = dir.Value
+	}
+
+	// Apply scheduler override into the Set so downstream code sees it.
+	if schedulerOverride != "" {
+		set.byKey["scheduler"] = schedulerOverride
+		found := false
+		for i := range set.Items {
+			if set.Items[i].Key == "scheduler" {
+				set.Items[i].Value = schedulerOverride
+				found = true
+				break
+			}
+		}
+		if !found {
+			set.Items = append([]Directive{{Key: "scheduler", Value: schedulerOverride}}, set.Items...)
+		}
+	}
+
 	return set, nil
+}
+
+// splitCondition checks if a directive body starts with `[key=value]`.
+// If so, it returns (key, value, remaining_body).
+// Otherwise it returns ("", "", body).
+func splitCondition(body string) (condKey, condValue, rest string) {
+	if !strings.HasPrefix(body, "[") {
+		return "", "", body
+	}
+	close := strings.IndexByte(body, ']')
+	if close < 0 {
+		return "", "", body
+	}
+	inner := body[1:close]
+	rest = strings.TrimSpace(body[close+1:])
+
+	eq := strings.IndexByte(inner, '=')
+	if eq < 0 {
+		// No = inside brackets: not a valid condition, treat as normal body
+		return "", "", body
+	}
+	return inner[:eq], inner[eq+1:], rest
 }
 
 func parseDirective(body string) (Directive, error) {
