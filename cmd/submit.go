@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,8 +16,10 @@ import (
 )
 
 var (
-	submitDryRun    bool
-	submitScheduler string
+	submitDryRun     bool
+	submitScheduler  string
+	submitOutScript  string
+	submitOutInfo    string
 )
 
 var submitCmd = &cobra.Command{
@@ -61,7 +62,7 @@ success.`,
 		}
 
 		now := time.Now()
-		genScriptPath, yamlPath := derivePaths(origPath)
+		genScriptPath, yamlPath := derivePaths(origPath, submitOutScript, submitOutInfo)
 
 		if err := os.WriteFile(genScriptPath, generated, 0o755); err != nil {
 			return fmt.Errorf("write generated script: %w", err)
@@ -93,21 +94,30 @@ success.`,
 	},
 }
 
-// derivePaths returns the (script, yaml) sidecar paths next to origPath:
-//   - <stem>.submit<ext>   (translated runnable script)
-//   - <stem>.info.yaml     (job metadata)
+// derivePaths returns the (script, yaml) sidecar paths.
 //
-// Resubmits overwrite. If origPath has no extension, .sh is assumed.
-func derivePaths(origPath string) (string, string) {
-	dir := filepath.Dir(origPath)
-	base := filepath.Base(origPath)
-	ext := filepath.Ext(base)
-	if ext == "" {
-		ext = ".sh"
+// By default they are placed next to origPath:
+//   - <orig>.submit      (translated runnable script)
+//   - <orig>.info.yaml   (job metadata)
+//
+// If outScript or outInfo are non-empty they override the default paths.
+// Resubmits overwrite.
+func derivePaths(origPath, outScript, outInfo string) (string, string) {
+	var scriptPath, yamlPath string
+	if outScript != "" {
+		scriptPath = outScript
+	} else {
+		dir := filepath.Dir(origPath)
+		base := filepath.Base(origPath)
+		scriptPath = filepath.Join(dir, base+".submit")
 	}
-	stem := strings.TrimSuffix(base, filepath.Ext(base))
-	scriptPath := filepath.Join(dir, fmt.Sprintf("%s.submit%s", stem, ext))
-	yamlPath := filepath.Join(dir, fmt.Sprintf("%s.info.yaml", stem))
+	if outInfo != "" {
+		yamlPath = outInfo
+	} else {
+		dir := filepath.Dir(origPath)
+		base := filepath.Base(origPath)
+		yamlPath = filepath.Join(dir, base+".info.yaml")
+	}
 	return scriptPath, yamlPath
 }
 
@@ -130,5 +140,7 @@ func usernameOrEmpty() string {
 func init() {
 	submitCmd.Flags().BoolVar(&submitDryRun, "dry-run", false, "Print the generated script and exit without submitting")
 	submitCmd.Flags().StringVar(&submitScheduler, "scheduler", "", "Override the scheduler (slurm, local, etc.)")
+	submitCmd.Flags().StringVar(&submitOutScript, "output-script", "", "Path for the generated runnable script (default: <orig>.<ext>.submit next to the input script)")
+	submitCmd.Flags().StringVar(&submitOutInfo, "output-info", "", "Path for the job info YAML sidecar (default: <orig>.<ext>.info.yaml next to the input script)")
 	rootCmd.AddCommand(submitCmd)
 }
