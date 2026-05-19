@@ -25,7 +25,7 @@ func TestWriteRoundtrip(t *testing.T) {
 		User:            "wangdp",
 		Directives: []DirectiveKV{
 			{Key: "scheduler", Value: "slurm"},
-			{Key: "partition", Value: "gpu"},
+			{Key: "queue", Value: "gpu"},
 			{Key: "exclusive"},
 		},
 	}
@@ -58,7 +58,7 @@ func TestFromDirectivesNil(t *testing.T) {
 
 func TestFromDirectivesPreservesOrder(t *testing.T) {
 	src := []byte(`#ORVIX scheduler=slurm
-#ORVIX partition=gpu
+#ORVIX queue=gpu
 #ORVIX nodes=2
 `)
 	set, err := directive.Parse(src)
@@ -66,7 +66,7 @@ func TestFromDirectivesPreservesOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := FromDirectives(set)
-	want := []string{"scheduler", "partition", "nodes"}
+	want := []string{"scheduler", "queue", "nodes"}
 	if len(got) != len(want) {
 		t.Fatalf("len(got) = %d, want %d", len(got), len(want))
 	}
@@ -92,7 +92,7 @@ func TestReadRoundtrip(t *testing.T) {
 		User:            "wangdp",
 		Directives: []DirectiveKV{
 			{Key: "scheduler", Value: "slurm"},
-			{Key: "partition", Value: "normal"},
+			{Key: "queue", Value: "normal"},
 		},
 	}
 	if err := Write(p, want); err != nil {

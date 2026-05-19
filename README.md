@@ -19,7 +19,7 @@ make build
 ```bash
 #!/bin/bash
 #ORVIX scheduler=slurm
-#ORVIX partition=normal
+#ORVIX queue=normal
 #ORVIX job-name=demo
 #ORVIX nodes=2
 #ORVIX time=01:00:00
@@ -67,7 +67,7 @@ $ orvix kill myjob.sh.info.yaml
 ```bash
 #!/bin/bash
 #ORVIX scheduler=slurm
-#ORVIX partition=normal
+#ORVIX queue=normal
 #ORVIX job-name=demo
 #ORVIX nodes=2
 #ORVIX time=01:00:00
@@ -94,35 +94,59 @@ echo "running"
 
 ### 常用指令
 
+#### 调度与标识
+
 | 指令 | 说明 | 示例 |
 |---|---|---|
 | `scheduler` | 选择调度后端（`slurm` 或 `local`），默认 `local` | `scheduler=slurm` |
 | `job-name` | 作业名称 | `job-name=myjob` |
-| `partition` | 分区/队列 | `partition=normal` |
+| `queue` | 分区/队列 | `queue=normal` |
+
+#### 计算资源
+
+| 指令 | 说明 | 示例 |
+|---|---|---|
 | `nodes` | 节点数 | `nodes=2` |
 | `ntasks` | 总任务数 | `ntasks=4` |
 | `ntasks-per-node` | 每节点任务数 | `ntasks-per-node=2` |
 | `cpus-per-task` | 每任务 CPU 数 | `cpus-per-task=4` |
 | `time` | 运行时限（`HH:MM:SS`） | `time=01:00:00` |
 | `memory` | 内存需求 | `memory=16G` |
+| `exclusive` | 独占节点 | `exclusive` |
+| `nodelist` | 指定节点 | `nodelist=node[01-04]` |
+
+#### 输入输出
+
+| 指令 | 说明 | 示例 |
+|---|---|---|
 | `output` | 标准输出文件 | `output=job.out` |
 | `error` | 标准错误文件 | `error=job.err` |
+
+#### 作业控制
+
+| 指令 | 说明 | 示例 |
+|---|---|---|
 | `account` | 计费账户 | `account=proj01` |
-| `nodelist` | 指定节点 | `nodelist=node[01-04]` |
-| `exclusive` | 独占节点 | `exclusive` |
 | `dependency` | 作业依赖 | `dependency=afterok:12345` |
+
+#### 平台必填项（CMA HPC）
+
+| 指令 | 说明 | 示例 |
+|---|---|---|
+| `project` | 项目编号 | `project=105-01-01` |
+| `application` | 应用名称 | `application=GRAPES` |
 
 ### 后端条件指令
 
 如果同一脚本需要在不同后端使用不同值，可以用 `[scheduler=<name>]` 条件前缀：
 
 ```bash
-#ORVIX partition=normal
+#ORVIX queue=normal
 #ORVIX [scheduler=slurm] account=slurm_proj
 #ORVIX [scheduler=donau] account=donau_proj
 ```
 
-上面例子中，`partition=normal` 对所有后端生效；`account` 的值则根据当前后端选择对应的行。条件行可以覆盖之前无条件设置的同名指令。
+上面例子中，`queue=normal` 对所有后端生效；`account` 的值则根据当前后端选择对应的行。条件行可以覆盖之前无条件设置的同名指令。
 
 ## 命令
 
@@ -185,7 +209,7 @@ user: wangdp
 directives:
     - key: scheduler
       value: slurm
-    - key: partition
+    - key: queue
       value: normal
     - key: nodes
       value: "2"

@@ -46,7 +46,7 @@ func TestParseBareKey(t *testing.T) {
 
 func TestParseQuotedValue(t *testing.T) {
 	src := []byte(`#ORVIX application="hello world"
-#ORVIX partition='a b c'
+#ORVIX queue='a b c'
 `)
 	set, err := Parse(src)
 	if err != nil {
@@ -55,8 +55,8 @@ func TestParseQuotedValue(t *testing.T) {
 	if got := set.Get("application"); got != "hello world" {
 		t.Errorf("application = %q, want %q", got, "hello world")
 	}
-	if got := set.Get("partition"); got != "a b c" {
-		t.Errorf("partition = %q, want %q", got, "a b c")
+	if got := set.Get("queue"); got != "a b c" {
+		t.Errorf("queue = %q, want %q", got, "a b c")
 	}
 }
 
@@ -134,7 +134,7 @@ func TestParseConditionalKeepsMatching(t *testing.T) {
 #ORVIX scheduler=donau
 #ORVIX nodes=2
 #ORVIX [scheduler=donau] nodelist=rp_cme001-418
-#ORVIX [scheduler=slurm] partition=normal
+#ORVIX [scheduler=slurm] queue=normal
 `)
 	set, err := Parse(src)
 	if err != nil {
@@ -146,8 +146,8 @@ func TestParseConditionalKeepsMatching(t *testing.T) {
 	if !set.Has("nodelist") {
 		t.Error("nodelist should be present ([scheduler=donau] matches)")
 	}
-	if set.Has("partition") {
-		t.Error("partition should be excluded ([scheduler=slurm] does not match scheduler=donau)")
+	if set.Has("queue") {
+		t.Error("queue should be excluded ([scheduler=slurm] does not match scheduler=donau)")
 	}
 	if got := set.Get("nodelist"); got != "rp_cme001-418" {
 		t.Errorf("nodelist = %q, want rp_cme001-418", got)
@@ -159,7 +159,7 @@ func TestParseConditionalDropsNonMatching(t *testing.T) {
 #ORVIX scheduler=slurm
 #ORVIX nodes=2
 #ORVIX [scheduler=donau] nodelist=rp_cme001-418
-#ORVIX [scheduler=slurm] partition=normal
+#ORVIX [scheduler=slurm] queue=normal
 `)
 	set, err := Parse(src)
 	if err != nil {
@@ -171,8 +171,8 @@ func TestParseConditionalDropsNonMatching(t *testing.T) {
 	if set.Has("nodelist") {
 		t.Error("nodelist should be excluded ([scheduler=donau] does not match scheduler=slurm)")
 	}
-	if !set.Has("partition") {
-		t.Error("partition should be present ([scheduler=slurm] matches scheduler=slurm)")
+	if !set.Has("queue") {
+		t.Error("queue should be present ([scheduler=slurm] matches scheduler=slurm)")
 	}
 }
 
@@ -253,7 +253,7 @@ func TestParseWithOverride(t *testing.T) {
 #ORVIX scheduler=slurm
 #ORVIX nodes=2
 #ORVIX [scheduler=donau] nodelist=rp_cme001-418
-#ORVIX [scheduler=slurm] partition=normal
+#ORVIX [scheduler=slurm] queue=normal
 `)
 	// Override to donau: condition filtering uses "donau", and Set.Scheduler() returns "donau"
 	set, err := ParseWithOverride(src, "donau")
@@ -263,8 +263,8 @@ func TestParseWithOverride(t *testing.T) {
 	if got := set.Scheduler(); got != "donau" {
 		t.Errorf("scheduler = %q, want donau", got)
 	}
-	if set.Has("partition") {
-		t.Error("partition should be excluded (condition matches slurm, not donau)")
+	if set.Has("queue") {
+		t.Error("queue should be excluded (condition matches slurm, not donau)")
 	}
 	if !set.Has("nodelist") {
 		t.Error("nodelist should be present (condition matches donau)")

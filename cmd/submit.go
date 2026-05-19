@@ -36,41 +36,49 @@ success.`,
 			return fmt.Errorf("resolve path: %w", err)
 		}
 
+		logPath := deriveLogPath(origPath)
+		wrap := func(err error) error {
+			if err != nil {
+				_ = writeSubmitLog(logPath, err)
+			}
+			return err
+		}
+
 		src, err := os.ReadFile(origPath)
 		if err != nil {
-			return fmt.Errorf("read script: %w", err)
+			return wrap(fmt.Errorf("read script: %w", err))
 		}
 
 		directives, err := directive.ParseWithOverride(src, submitScheduler)
 		if err != nil {
-			return fmt.Errorf("parse directives: %w", err)
+			return wrap(fmt.Errorf("parse directives: %w", err))
 		}
 
 		sched, err := scheduler.For(directives)
 		if err != nil {
-			return fmt.Errorf("resolve scheduler: %w", err)
+			return wrap(fmt.Errorf("resolve scheduler: %w", err))
 		}
 
 		generated, err := script.Generate(src, directives, sched)
 		if err != nil {
-			return fmt.Errorf("generate script: %w", err)
+			return wrap(fmt.Errorf("generate script: %w", err))
 		}
 
 		if submitDryRun {
-			_, err := cmd.OutOrStdout().Write(generated)
-			return err
+			_, err = cmd.OutOrStdout().Write(generated)
+			return wrap(err)
 		}
 
 		now := time.Now()
 		genScriptPath, yamlPath := derivePaths(origPath, submitOutScript, submitOutInfo)
 
 		if err := os.WriteFile(genScriptPath, generated, 0o755); err != nil {
-			return fmt.Errorf("write generated script: %w", err)
+			return wrap(fmt.Errorf("write generated script: %w", err))
 		}
 
 		jobID, err := sched.Submit(genScriptPath)
 		if err != nil {
-			return fmt.Errorf("submit: %w", err)
+			return wrap(fmt.Errorf("submit: %w", err))
 		}
 
 		cwd, _ := os.Getwd()
@@ -86,7 +94,7 @@ success.`,
 			Directives:      jobinfo.FromDirectives(directives),
 		}
 		if err := jobinfo.Write(yamlPath, info); err != nil {
-			return fmt.Errorf("write job info: %w", err)
+			return wrap(fmt.Errorf("write job info: %w", err))
 		}
 
 		fmt.Fprintln(cmd.OutOrStdout(), jobID)
@@ -119,6 +127,29 @@ func derivePaths(origPath, outScript, outInfo string) (string, string) {
 		yamlPath = filepath.Join(dir, base+".info.yaml")
 	}
 	return scriptPath, yamlPath
+}
+
+// deriveLogPath returns the default log path for a failed submit:
+//   - <orig>.submit.log
+func deriveLogPath(origPath string) string {
+	dir := filepath.Dir(origPath)
+	base := filepath.Base(origPath)
+	return filepath.Join(dir, base+".submit.log")
+}
+
+// writeSubmitLog writes err to path with a timestamp.
+// Failures are silently ignored so logging never masks the original error.
+func writeSubmitLog(path string, err error) error {
+	if err == nil {
+		return nil
+	}
+	f, e := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if e != nil {
+		return e
+	}
+	defer f.Close()
+	_, e = fmt.Fprintf(f, "[%s] ERROR: %v\n", time.Now().Format(time.RFC3339), err)
+	return e
 }
 
 func hostnameOrEmpty() string {

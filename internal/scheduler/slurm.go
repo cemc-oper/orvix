@@ -28,7 +28,7 @@ var slurmFlag = map[string]string{
 	"ntasks-per-node": "ntasks-per-node", // --ntasks-per-node
 	"cpus-per-task":   "cpus-per-task", // --cpus-per-task
 	"time":            "time",          // --time
-	"partition":       "partition",     // --partition
+	"queue":           "partition",     // --partition
 	"account":         "account",       // --account
 	"project":         "wckey",         // --wckey
 	"application":     "comment",       // --comment

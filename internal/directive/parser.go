@@ -34,7 +34,7 @@ var KnownDirectives = map[string]bool{
 	"ntasks-per-node": true,
 	"cpus-per-task":   true,
 	"time":            true,
-	"partition":       true,
+	"queue":           true,
 	"account":         true,
 	"project":         true,
 	"application":     true,
