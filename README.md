@@ -6,11 +6,13 @@ orvix 是一个将脚本任务提交到 HPC 集群上运行的命令行工具。
 
 ## 安装
 
+在 Linux 环境中可以直接使用 Makefile 编译：
+
 ```bash
 make build
 ```
 
-二进制文件生成到 `bin/orvix`，可将其加入 `PATH`。
+编译成功将生成可执行程序 `bin/orvix`，可将其加入 `PATH`。
 
 ## 快速开始
 
@@ -53,12 +55,20 @@ RUNNING
 $ orvix kill myjob.sh.info.yaml
 ```
 
-## 支持的调度后端
+## 工作流程
 
-| 后端 | 说明 |
-|---|---|
-| `slurm` | 翻译为 `#SBATCH` 指令，通过 `sbatch` 提交到 SLURM 集群 |
-| `local` | 在本机直接以子进程方式执行，用于本地测试 |
+```mermaid
+flowchart LR
+    A[用户脚本<br/>#ORVIX 指令] --> B[orvix submit]
+    B --> C[解析 #ORVIX 指令]
+    C --> D[选择调度后端]
+    D --> E[生成翻译后脚本]
+    E --> F{dry-run?}
+    F -->|是| G[打印脚本]
+    F -->|否| H[提交到调度系统]
+    H --> I[输出作业 ID]
+    I --> J[生成 .info.yaml]
+```
 
 ## 指令语法
 
@@ -133,8 +143,8 @@ echo "running"
 
 | 指令 | 说明 | 示例 |
 |---|---|---|
-| `project` | 项目编号 | `project=105-01-01` |
-| `application` | 应用名称 | `application=GRAPES` |
+| `project` | 项目任务编号，由超算管理员提供 | `project=105-01-01` |
+| `application` | 应用名称，由超算管理员提供。可以使用 `modelname` 查看可选项。例如 `GRAPES`、`MCV` 等等 | `application=GRAPES` |
 
 ### 后端条件指令
 
@@ -185,15 +195,18 @@ $ orvix kill case/job/serial/orvix_serial.info.yaml
 
 ## 生成的文件
 
-提交 `path/to/script.sh` 后，会在**同目录**生成两个文件：
+提交 `path/to/script.sh` 后，会在**同目录**生成以下文件。
 
 ```
-path/to/script.sh             # 原始脚本（不变）
-path/to/script.sh.submit      # 翻译后真正执行的脚本
-path/to/script.sh.info.yaml      # 作业元数据（status/kill 需要用到）
+path/to/script.sh              # 原始脚本（不变）
+path/to/script.sh.submit       # 翻译后真正执行的脚本
+path/to/script.sh.info.yaml    # 作业元数据（status/kill 需要用到）
+path/to/script.sh.submit.log   # 提交失败时的错误日志（仅失败时生成）
 ```
 
-重复提交会覆盖同名文件。脚本无扩展名时，生成脚本默认补 `.sh`。
+- 成功提交时会生成 `.submit` 和 `.info.yaml` 两个文件
+- 提交失败（如解析错误、调度系统拒绝等）时会额外生成 `.submit.log`，记录错误原因和时间戳
+- 重复提交会覆盖同名文件。脚本无扩展名时，生成脚本默认补 `.sh`。
 
 `info.yaml` 示例：
 
@@ -214,6 +227,36 @@ directives:
     - key: nodes
       value: "2"
 ```
+
+## 支持的调度后端
+
+| 后端 | 说明 |
+|---|---|
+| `slurm` | 翻译为 `#SBATCH` 指令，通过 `sbatch` 提交到 SLURM 集群 |
+| `local` | 在本机直接以子进程方式执行，用于本地测试 |
+
+### SLURM 指令映射
+
+使用 `scheduler=slurm` 时，orvix 指令与 SLURM 指令的对应关系如下：
+
+| orvix 指令 | SLURM 指令 | 说明 |
+|---|---|---|
+| `job-name` | `--job-name` | 作业名称 |
+| `output` | `--output` | 标准输出文件 |
+| `error` | `--error` | 标准错误文件 |
+| `nodes` | `--nodes` | 节点数 |
+| `ntasks` | `--ntasks` | 总任务数 |
+| `ntasks-per-node` | `--ntasks-per-node` | 每节点任务数 |
+| `cpus-per-task` | `--cpus-per-task` | 每任务 CPU 数 |
+| `time` | `--time` | 运行时限（`HH:MM:SS`） |
+| `queue` | `--partition` | 分区/队列 |
+| `account` | `--account` | 计费账户 |
+| `project` | `--wckey` | 项目任务编号 |
+| `application` | `--comment` | 应用名称 |
+| `exclusive` | `--exclusive` | 独占节点 |
+| `nodelist` | `--nodelist` | 指定节点 |
+| `memory` | `--mem` | 内存需求 |
+| `dependency` | `--dependency` | 作业依赖 |
 
 ## 许可证
 
