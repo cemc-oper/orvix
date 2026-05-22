@@ -72,14 +72,14 @@ func slurmQuote(v string) string {
 	return v
 }
 
-func (s *SLURM) Submit(scriptPath string) (string, error) {
+func (s *SLURM) Submit(scriptPath string) (string, string, error) {
 	log.Debugf("[slurm] sbatch --parsable %s", scriptPath)
 	cmd := exec.Command("sbatch", "--parsable", scriptPath)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("sbatch failed: %s: %w", strings.TrimSpace(errBuf.String()), err)
+		return "", cmd.String(), fmt.Errorf("sbatch failed: %s: %w", strings.TrimSpace(errBuf.String()), err)
 	}
 	// --parsable returns "<jobid>" or "<jobid>;<cluster>".
 	id := strings.TrimSpace(out.String())
@@ -87,7 +87,7 @@ func (s *SLURM) Submit(scriptPath string) (string, error) {
 		id = id[:i]
 	}
 	log.Debugf("[slurm] sbatch returned job id: %s", id)
-	return id, nil
+	return id, cmd.String(), nil
 }
 
 func (s *SLURM) Status(jobID string) (string, error) {

@@ -21,19 +21,19 @@ func (l *Local) PreambleFor(_ *directive.Set) ([]string, error) {
 	return nil, nil
 }
 
-func (l *Local) Submit(scriptPath string) (string, error) {
+func (l *Local) Submit(scriptPath string) (string, string, error) {
 	log.Debugf("[local] starting script: %s", scriptPath)
 	cmd := exec.Command(scriptPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
-		return "", err
+		return "", cmd.String(), err
 	}
 	pid := cmd.Process.Pid
 	log.Debugf("[local] started process, pid=%d", pid)
 	// Reap the child in the background so we don't leave a zombie.
 	go cmd.Wait()
-	return strconv.Itoa(pid), nil
+	return strconv.Itoa(pid), cmd.String(), nil
 }
 
 func (l *Local) Status(jobID string) (string, error) {

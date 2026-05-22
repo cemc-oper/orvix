@@ -14,6 +14,7 @@ import (
 
 // JobInfo is the on-disk record of a submitted orvix job.
 type JobInfo struct {
+	Version         string        `yaml:"version,omitempty"`
 	Scheduler       string        `yaml:"scheduler"`
 	JobID           string        `yaml:"job_id"`
 	SubmittedAt     time.Time     `yaml:"submitted_at"`
@@ -22,13 +23,15 @@ type JobInfo struct {
 	SubmitDir       string        `yaml:"submit_dir,omitempty"`
 	Hostname        string        `yaml:"hostname,omitempty"`
 	User            string        `yaml:"user,omitempty"`
+	SubmitCommand   string        `yaml:"submit_command,omitempty"`
 	Directives      []DirectiveKV `yaml:"directives,omitempty"`
 }
 
 // DirectiveKV is one parsed `#ORVIX key=value` line, recorded for traceability.
 type DirectiveKV struct {
-	Key   string `yaml:"key"`
-	Value string `yaml:"value,omitempty"`
+	Key       string `yaml:"key"`
+	Value     string `yaml:"value,omitempty"`
+	Condition string `yaml:"condition,omitempty"` // e.g. "scheduler=slurm"; empty means unconditional
 }
 
 // FromDirectives copies a directive.Set into the YAML-friendly slice form.
@@ -38,7 +41,11 @@ func FromDirectives(d *directive.Set) []DirectiveKV {
 	}
 	out := make([]DirectiveKV, 0, len(d.Items))
 	for _, item := range d.Items {
-		out = append(out, DirectiveKV{Key: item.Key, Value: item.Value})
+		dkv := DirectiveKV{Key: item.Key, Value: item.Value}
+		if item.ConditionKey != "" {
+			dkv.Condition = item.ConditionKey + "=" + item.ConditionValue
+		}
+		out = append(out, dkv)
 	}
 	return out
 }

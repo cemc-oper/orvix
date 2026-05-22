@@ -14,9 +14,10 @@ type Scheduler interface {
 	// PreambleFor converts orvix directives to the scheduler's directive lines
 	// (e.g. #SBATCH lines for SLURM). Returned lines have no trailing newline.
 	PreambleFor(d *directive.Set) ([]string, error)
-	// Submit hands the script at scriptPath to the scheduler and returns a job id.
+	// Submit hands the script at scriptPath to the scheduler and returns a job id
+	// together with the command string that was executed.
 	// The caller is responsible for having written scriptPath with executable mode.
-	Submit(scriptPath string) (string, error)
+	Submit(scriptPath string) (jobID string, command string, err error)
 	// Status reports the state of a previously submitted job.
 	Status(jobID string) (string, error)
 	// Kill terminates a running job.

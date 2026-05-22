@@ -14,6 +14,7 @@ import (
 	"github.com/cemc-oper/orvix/internal/log"
 	"github.com/cemc-oper/orvix/internal/scheduler"
 	"github.com/cemc-oper/orvix/internal/script"
+	"github.com/cemc-oper/orvix/internal/version"
 	"github.com/cemc-oper/orvix/internal/watch"
 )
 
@@ -86,7 +87,7 @@ func Run(opts Options) error {
 	}
 	log.Debug("[submit] wrote generated script")
 
-	jobID, err := sched.Submit(genScriptPath)
+	jobID, submitCmd, err := sched.Submit(genScriptPath)
 	if err != nil {
 		return wrap(fmt.Errorf("submit: %w", err))
 	}
@@ -94,6 +95,7 @@ func Run(opts Options) error {
 
 	cwd, _ := os.Getwd()
 	info := jobinfo.JobInfo{
+		Version:         version.Version,
 		Scheduler:       sched.Name(),
 		JobID:           jobID,
 		SubmittedAt:     now,
@@ -102,6 +104,7 @@ func Run(opts Options) error {
 		SubmitDir:       cwd,
 		Hostname:        hostnameOrEmpty(),
 		User:            usernameOrEmpty(),
+		SubmitCommand:   submitCmd,
 		Directives:      jobinfo.FromDirectives(directives),
 	}
 	if err := jobinfo.Write(yamlPath, info); err != nil {
