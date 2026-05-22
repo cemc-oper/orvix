@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/cemc-oper/orvix/internal/directive"
@@ -57,4 +58,15 @@ func (l *Local) Kill(jobID string) error {
 		return err
 	}
 	return proc.Kill()
+}
+
+func (l *Local) NormalizeState(raw string) JobState {
+	switch strings.ToUpper(raw) {
+	case "RUNNING":
+		return StateRunning
+	case "FINISHED":
+		return StateCompleted
+	default:
+		return StateUnknown
+	}
 }

@@ -116,3 +116,24 @@ func (s *SLURM) Kill(jobID string) error {
 	}
 	return nil
 }
+
+func (s *SLURM) NormalizeState(raw string) JobState {
+	switch strings.ToUpper(raw) {
+	case "RUNNING":
+		return StateRunning
+	case "PENDING", "CONFIGURING":
+		return StatePending
+	case "COMPLETED":
+		return StateCompleted
+	case "FAILED", "NODE_FAIL", "BOOT_FAIL", "DEADLINE", "PREEMPTED":
+		return StateFailed
+	case "CANCELLED":
+		return StateCancelled
+	case "TIMEOUT":
+		return StateTimeout
+	case "OUT_OF_MEMORY", "OOM":
+		return StateFailed
+	default:
+		return StateUnknown
+	}
+}

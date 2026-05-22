@@ -21,6 +21,9 @@ type Scheduler interface {
 	Status(jobID string) (string, error)
 	// Kill terminates a running job.
 	Kill(jobID string) error
+	// NormalizeState converts a scheduler-specific raw state string to a
+	// scheduler-agnostic JobState.
+	NormalizeState(raw string) JobState
 }
 
 // For picks the scheduler implementation based on parsed directives.
