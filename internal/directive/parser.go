@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+
+	"github.com/cemc-oper/orvix/internal/log"
 )
 
 // Marker is the prefix that identifies an orvix directive line.
@@ -154,6 +156,7 @@ func ParseWithOverride(src []byte, schedulerOverride string) (*Set, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
+	log.Debugf("[directive] parsed %d raw directive line(s)", len(raw))
 
 	// Determine scheduler: override takes precedence.
 	sched := schedulerOverride
@@ -168,6 +171,7 @@ func ParseWithOverride(src []byte, schedulerOverride string) (*Set, error) {
 	if sched == "" {
 		sched = "local"
 	}
+	log.Debugf("[directive] effective scheduler: %s", sched)
 
 	// Filter by condition and known-directive set, then build the final Set.
 	set := &Set{byKey: make(map[string]string)}
@@ -176,11 +180,13 @@ func ParseWithOverride(src []byte, schedulerOverride string) (*Set, error) {
 			continue // skip conditionally excluded directives
 		}
 		if !KnownDirectives[dir.Key] {
+			log.Debugf("[directive] dropping unknown directive: %s", dir.Key)
 			continue // skip unknown directives (no backward-compatible passthrough)
 		}
 		set.Items = append(set.Items, dir)
 		set.byKey[dir.Key] = dir.Value
 	}
+	log.Debugf("[directive] %d directive(s) after filtering", len(set.Items))
 
 	// Apply scheduler override into the Set so downstream code sees it.
 	if schedulerOverride != "" {

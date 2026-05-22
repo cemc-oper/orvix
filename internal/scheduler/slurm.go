@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cemc-oper/orvix/internal/directive"
+	"github.com/cemc-oper/orvix/internal/log"
 )
 
 // SLURM submits jobs via sbatch / squeue / scancel.
@@ -19,24 +20,24 @@ func (s *SLURM) Name() string { return "slurm" }
 // silently skipped. Entries whose key and value are identical are listed
 // explicitly for clarity and auditability.
 var slurmFlag = map[string]string{
-	"scheduler":       "",              // consumed by orvix
-	"job-name":        "job-name",      // --job-name
-	"output":          "output",        // --output
-	"error":           "error",         // --error
-	"nodes":           "nodes",         // --nodes
-	"ntasks":          "ntasks",        // --ntasks
+	"scheduler":       "",                // consumed by orvix
+	"job-name":        "job-name",        // --job-name
+	"output":          "output",          // --output
+	"error":           "error",           // --error
+	"nodes":           "nodes",           // --nodes
+	"ntasks":          "ntasks",          // --ntasks
 	"ntasks-per-node": "ntasks-per-node", // --ntasks-per-node
-	"cpus-per-task":   "cpus-per-task", // --cpus-per-task
-	"time":            "time",          // --time
-	"queue":           "partition",     // --partition
-	"account":         "account",       // --account
-	"project":         "wckey",         // --wckey
-	"application":     "comment",       // --comment
-	"exclusive":       "exclusive",     // --exclusive
-	"nodelist":        "nodelist",      // --nodelist
-	"job-type":        "",              // no SLURM equivalent
-	"memory":          "mem",           // --mem
-	"dependency":      "dependency",    // --dependency
+	"cpus-per-task":   "cpus-per-task",   // --cpus-per-task
+	"time":            "time",            // --time
+	"queue":           "partition",       // --partition
+	"account":         "account",         // --account
+	"project":         "wckey",           // --wckey
+	"application":     "comment",         // --comment
+	"exclusive":       "exclusive",       // --exclusive
+	"nodelist":        "nodelist",        // --nodelist
+	"job-type":        "",                // no SLURM equivalent
+	"memory":          "mem",             // --mem
+	"dependency":      "dependency",      // --dependency
 }
 
 // PreambleFor translates orvix generic directives to #SBATCH lines.
@@ -60,6 +61,7 @@ func (s *SLURM) PreambleFor(d *directive.Set) ([]string, error) {
 			lines = append(lines, fmt.Sprintf("#SBATCH --%s=%s", flag, slurmQuote(item.Value)))
 		}
 	}
+	log.Debugf("[slurm] preamble: %d line(s)", len(lines))
 	return lines, nil
 }
 
@@ -71,6 +73,7 @@ func slurmQuote(v string) string {
 }
 
 func (s *SLURM) Submit(scriptPath string) (string, error) {
+	log.Debugf("[slurm] sbatch --parsable %s", scriptPath)
 	cmd := exec.Command("sbatch", "--parsable", scriptPath)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out
@@ -83,37 +86,50 @@ func (s *SLURM) Submit(scriptPath string) (string, error) {
 	if i := strings.IndexByte(id, ';'); i > 0 {
 		id = id[:i]
 	}
+	log.Debugf("[slurm] sbatch returned job id: %s", id)
 	return id, nil
 }
 
 func (s *SLURM) Status(jobID string) (string, error) {
+	log.Debugf("[slurm] squeue -j %s -h -o %%T", jobID)
 	cmd := exec.Command("squeue", "-j", jobID, "-h", "-o", "%T")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		// squeue forgets completed jobs quickly; fall back to sacct.
-		sacct := exec.Command("sacct", "-j", jobID, "-n", "-X", "-o", "State")
-		var sout bytes.Buffer
-		sacct.Stdout = &sout
-		if serr := sacct.Run(); serr != nil {
-			return "", fmt.Errorf("squeue: %w; sacct: %v", err, serr)
-		}
-		return strings.TrimSpace(sout.String()), nil
+		return s.sacctState(jobID, fmt.Sprintf("squeue: %v", err))
 	}
 	state := strings.TrimSpace(out.String())
-	if state == "" {
-		return "UNKNOWN", nil
+	if state != "" {
+		log.Debugf("[slurm] squeue state: %s", state)
+		return state, nil
 	}
+
+	log.Debug("[slurm] squeue returned empty, falling back to sacct")
+	return s.sacctState(jobID, "squeue: empty state")
+}
+
+func (s *SLURM) sacctState(jobID string, reason string) (string, error) {
+	log.Debugf("[slurm] sacct -j %s -n -X -o State", jobID)
+	sacct := exec.Command("sacct", "-j", jobID, "-n", "-X", "-o", "State")
+	var sout bytes.Buffer
+	sacct.Stdout = &sout
+	if serr := sacct.Run(); serr != nil {
+		return "", fmt.Errorf("%s; sacct: %v", reason, serr)
+	}
+	state := strings.TrimSpace(sout.String())
+	log.Debugf("[slurm] sacct state: %s", state)
 	return state, nil
 }
 
 func (s *SLURM) Kill(jobID string) error {
+	log.Debugf("[slurm] scancel %s", jobID)
 	cmd := exec.Command("scancel", jobID)
 	var errBuf bytes.Buffer
 	cmd.Stderr = &errBuf
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("scancel: %s: %w", strings.TrimSpace(errBuf.String()), err)
 	}
+	log.Debugf("[slurm] scancel succeeded for job %s", jobID)
 	return nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cemc-oper/orvix/internal/directive"
+	"github.com/cemc-oper/orvix/internal/log"
 	"github.com/cemc-oper/orvix/internal/scheduler"
 )
 
@@ -21,6 +22,7 @@ func Generate(src []byte, d *directive.Set, sched scheduler.Scheduler) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("[script] preamble: %d line(s)", len(preamble))
 
 	var (
 		shebang string
@@ -37,6 +39,7 @@ func Generate(src []byte, d *directive.Set, sched scheduler.Scheduler) ([]byte, 
 			first = false
 			if strings.HasPrefix(line, "#!") {
 				shebang = line
+				log.Debugf("[script] shebang: %s", shebang)
 				continue
 			}
 		}
@@ -63,5 +66,6 @@ func Generate(src []byte, d *directive.Set, sched scheduler.Scheduler) ([]byte, 
 		fmt.Fprintln(&out)
 	}
 	out.Write(body)
+	log.Debugf("[script] generated script: %d bytes", out.Len())
 	return out.Bytes(), nil
 }

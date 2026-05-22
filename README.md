@@ -49,10 +49,29 @@ $ orvix status myjob.sh.info.yaml
 RUNNING
 ```
 
+Watch the job until it finishes:
+
+```bash
+$ orvix watch myjob.sh.info.yaml
+[2026-05-22T03:48:10Z] PENDING
+[2026-05-22T03:48:15Z] RUNNING
+[2026-05-22T03:50:20Z] COMPLETED
+```
+
 Kill the job with `orvix kill`:
 
 ```bash
 $ orvix kill myjob.sh.info.yaml
+```
+
+Submit and watch in one step:
+
+```bash
+$ orvix submit --watch myjob.sh
+12345678
+[2026-05-22T03:48:10Z] PENDING
+[2026-05-22T03:48:15Z] RUNNING
+[2026-05-22T03:50:20Z] COMPLETED
 ```
 
 ## Workflow
@@ -68,6 +87,9 @@ flowchart LR
     F -->|No| H[Submit to Scheduler]
     H --> I[Output Job ID]
     I --> J[Generate .info.yaml]
+    J --> K{--watch?}
+    K -->|Yes| L[Poll Status until Terminal]
+    K -->|No| M[Done]
 ```
 
 ## Directive Syntax
@@ -172,8 +194,10 @@ $ orvix submit case/job/serial/orvix_serial.sh
 Options:
 
 ```bash
-orvix submit --dry-run script.sh           # Only print the translated script, do not submit
-orvix submit --scheduler=slurm script.sh   # Force a scheduler backend, overriding the script setting
+orvix submit --dry-run script.sh                    # Only print the translated script, do not submit
+orvix submit --scheduler=slurm script.sh            # Force a scheduler backend, overriding the script setting
+orvix submit --watch script.sh                      # Submit and poll status until the job finishes
+orvix submit --watch --watch-interval=10s script.sh # Custom polling interval (default: 5s)
 ```
 
 ### `orvix status <info.yaml>`
@@ -183,6 +207,23 @@ Query the job status.
 ```bash
 $ orvix status case/job/serial/orvix_serial.info.yaml
 RUNNING
+```
+
+### `orvix watch [flags] <info.yaml>`
+
+Poll job status repeatedly until the job reaches a terminal state (COMPLETED, FAILED, CANCELLED, TIMEOUT).
+
+```bash
+$ orvix watch case/job/serial/orvix_serial.info.yaml
+[2026-05-22T10:00:00Z] PENDING
+[2026-05-22T10:00:05Z] RUNNING
+[2026-05-22T10:02:00Z] COMPLETED
+```
+
+Options:
+
+```bash
+orvix watch -i 10s case/job/serial/orvix_serial.info.yaml  # Poll every 10 seconds (default: 5s)
 ```
 
 ### `orvix kill <info.yaml>`
