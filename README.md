@@ -1,22 +1,22 @@
 # orvix
 
-orvix is a command-line tool for submitting script jobs to HPC clusters.
+orvix 是一个用于向 HPC 集群提交脚本作业的命令行工具。
 
-Simply write resource requirements in your script header using the unified `#ORVIX key=value` syntax, and orvix will automatically translate them into directives for the target scheduler (e.g., SLURM) and submit the job.
+只需在脚本头部使用统一的 `#ORVIX key=value` 语法编写资源需求，orvix 会自动将其转换为目标调度器（如 SLURM）的指令并提交作业。
 
-## Installation
+## 安装
 
-On Linux, build directly with the Makefile:
+在 Linux 上，可直接使用 Makefile 构建：
 
 ```bash
 make build
 ```
 
-On success, the binary `bin/orvix` is generated. Add it to your `PATH` for convenience.
+构建成功后，将生成二进制文件 `bin/orvix`。
 
-## Quick Start
+## 快速开始
 
-Add `#ORVIX` directives to the top of your script:
+在脚本顶部添加 `#ORVIX` 指令：
 
 ```bash
 #!/bin/bash
@@ -30,26 +30,26 @@ Add `#ORVIX` directives to the top of your script:
 echo "Hello from HPC"
 ```
 
-Submit the script with `orvix submit`:
+使用 `orvix submit` 提交脚本：
 
 ```bash
 $ orvix submit myjob.sh
 12345678
 ```
 
-This command creates two sidecar files:
+该命令会生成两个附属文件：
 
-- `myjob.sh.submit`: the translated script submitted to the job queue
-- `myjob.sh.info.yaml`: job metadata, including the job ID
+- `myjob.sh.submit`：翻译后的脚本，用于提交到作业队列
+- `myjob.sh.info.yaml`：作业元数据，包含作业 ID
 
-Check job status with `orvix status`:
+使用 `orvix status` 查看作业状态：
 
 ```bash
 $ orvix status myjob.sh.info.yaml
 RUNNING
 ```
 
-Watch the job until it finishes:
+使用 `orvix watch` 持续监视作业直到结束：
 
 ```bash
 $ orvix watch myjob.sh.info.yaml
@@ -58,13 +58,13 @@ $ orvix watch myjob.sh.info.yaml
 [2026-05-22T03:50:20Z] COMPLETED
 ```
 
-Kill the job with `orvix kill`:
+使用 `orvix kill` 终止作业：
 
 ```bash
 $ orvix kill myjob.sh.info.yaml
 ```
 
-Submit and watch in one step:
+一步完成提交和监视：
 
 ```bash
 $ orvix submit --watch myjob.sh
@@ -74,27 +74,27 @@ $ orvix submit --watch myjob.sh
 [2026-05-22T03:50:20Z] COMPLETED
 ```
 
-## Workflow
+## 工作流程
 
 ```mermaid
-flowchart LR
-    A[User Script<br/>#ORVIX Directives] --> B[orvix submit]
-    B --> C[Parse #ORVIX Directives]
-    C --> D[Select Scheduler Backend]
-    D --> E[Generate Translated Script]
+flowchart TD
+    A[用户脚本<br/>#ORVIX 指令] --> B[orvix submit]
+    B --> C[解析 #ORVIX 指令]
+    C --> D[选择调度器后端]
+    D --> E[生成翻译后的脚本]
     E --> F{dry-run?}
-    F -->|Yes| G[Print Script]
-    F -->|No| H[Submit to Scheduler]
-    H --> I[Output Job ID]
-    I --> J[Generate .info.yaml]
+    F -->|是| G[打印脚本]
+    F -->|否| H[提交到调度器]
+    H --> I[输出作业 ID]
+    I --> J[生成 .info.yaml]
     J --> K{--watch?}
-    K -->|Yes| L[Poll Status until Terminal]
-    K -->|No| M[Done]
+    K -->|是| L[轮询状态直到结束]
+    K -->|否| M[完成]
 ```
 
-## Directive Syntax
+## 指令语法
 
-`#ORVIX` directives must appear in the initial comment block of the script (before the first non-blank, non-comment line):
+`#ORVIX` 指令必须出现在脚本的初始注释块中（在第一个非空、非注释行之前）：
 
 ```bash
 #!/bin/bash
@@ -110,67 +110,67 @@ set -euo pipefail
 echo "running"
 ```
 
-### Syntax Rules
+### 语法规则
 
-| Syntax | Meaning |
+| 语法 | 含义 |
 |---|---|
-| `#ORVIX key=value` | Directive with a value |
-| `#ORVIX key` | Valueless directive (e.g., boolean flags like `exclusive`) |
-| `#ORVIX key="x y"` or `'x y'` | Values containing spaces must be wrapped in double or single quotes |
+| `#ORVIX key=value` | 带值的指令 |
+| `#ORVIX key` | 无值指令（如布尔标志 `exclusive`） |
+| `#ORVIX key="x y"` 或 `'x y'` | 包含空格的值必须用双引号或单引号包裹 |
 
-Notes:
+注意事项：
 
-- `#ORVIX` must be uppercase with no space after `#`. `# ORVIX`, `#orvix`, and `#ORVIXFOO` are all ignored.
-- Parsing stops at the first non-blank, non-comment line.
-- Directives must be in `key=value` form; `key value` (without `=`) is an error.
+- `#ORVIX` 必须为大写，`#` 后不能有空格。`# ORVIX`、`#orvix` 和 `#ORVIXFOO` 均会被忽略。
+- 解析在第一个非空、非注释行处停止。
+- 指令必须为 `key=value` 形式；`key value`（无 `=`）是错误。
 
-### Common Directives
+### 常用指令
 
-#### Scheduler & Identity
+#### 调度器与标识
 
-| Directive | Description | Example |
+| 指令 | 说明 | 示例 |
 |---|---|---|
-| `scheduler` | Select scheduler backend (`slurm` or `local`), default `local` | `scheduler=slurm` |
-| `job-name` | Job name | `job-name=myjob` |
-| `queue` | Partition / queue | `queue=normal` |
+| `scheduler` | 选择调度器后端（`slurm` 或 `local`），默认 `local` | `scheduler=slurm` |
+| `job-name` | 作业名称 | `job-name=myjob` |
+| `queue` | 分区 / 队列 | `queue=normal` |
 
-#### Compute Resources
+#### 计算资源
 
-| Directive | Description | Example |
+| 指令 | 说明 | 示例 |
 |---|---|---|
-| `nodes` | Number of nodes | `nodes=2` |
-| `ntasks` | Total number of tasks | `ntasks=4` |
-| `ntasks-per-node` | Tasks per node | `ntasks-per-node=2` |
-| `cpus-per-task` | CPUs per task | `cpus-per-task=4` |
-| `time` | Time limit (`HH:MM:SS`) | `time=01:00:00` |
-| `memory` | Memory requirement | `memory=16G` |
-| `exclusive` | Exclusive node access | `exclusive` |
-| `nodelist` | Specific node list | `nodelist=node[01-04]` |
+| `nodes` | 节点数量 | `nodes=2` |
+| `ntasks` | 任务总数 | `ntasks=4` |
+| `ntasks-per-node` | 每节点任务数 | `ntasks-per-node=2` |
+| `cpus-per-task` | 每任务 CPU 数 | `cpus-per-task=4` |
+| `time` | 时间限制（`HH:MM:SS`） | `time=01:00:00` |
+| `memory` | 内存需求 | `memory=16G` |
+| `exclusive` | 独占节点访问 | `exclusive` |
+| `nodelist` | 指定节点列表 | `nodelist=node[01-04]` |
 
 #### I/O
 
-| Directive | Description | Example |
+| 指令 | 说明 | 示例 |
 |---|---|---|
-| `output` | Standard output file | `output=job.out` |
-| `error` | Standard error file | `error=job.err` |
+| `output` | 标准输出文件 | `output=job.out` |
+| `error` | 标准错误文件 | `error=job.err` |
 
-#### Job Control
+#### 作业控制
 
-| Directive | Description | Example |
+| 指令 | 说明 | 示例 |
 |---|---|---|
-| `account` | Billing account | `account=proj01` |
-| `dependency` | Job dependency | `dependency=afterok:12345` |
+| `account` | 计费账户 | `account=proj01` |
+| `dependency` | 作业依赖 | `dependency=afterok:12345` |
 
-#### Platform-Required Fields (CMA HPC)
+#### 平台必填字段（CMA HPC）
 
-| Directive | Description | Example |
+| 指令 | 说明 | 示例 |
 |---|---|---|
-| `project` | Project task number, provided by the HPC administrator | `project=105-01-01` |
-| `application` | Application name, provided by the HPC administrator. Use `modelname` to see available options, e.g., `GRAPES`, `MCV`, etc. | `application=GRAPES` |
+| `project` | 项目任务号，由 HPC 管理员提供 | `project=105-01-01` |
+| `application` | 应用名称，由 HPC 管理员提供。使用 `modelname` 查看可用选项，如 `GRAPES`、`MCV` 等 | `application=GRAPES` |
 
-### Backend-Conditional Directives
+### 后端条件指令
 
-If the same script needs different values for different backends, use the `[scheduler=<name>]` conditional prefix:
+如果同一脚本在不同后端需要不同值，可使用 `[scheduler=<name>]` 条件前缀：
 
 ```bash
 #ORVIX queue=normal
@@ -178,31 +178,31 @@ If the same script needs different values for different backends, use the `[sche
 #ORVIX [scheduler=donau] account=donau_proj
 ```
 
-In the example above, `queue=normal` applies to all backends; the `account` value is selected based on the active backend. Conditional lines can override an earlier unconditional directive with the same key.
+在上例中，`queue=normal` 适用于所有后端；`account` 的值根据当前后端选择。条件行可以覆盖之前同键的无条件指令。
 
-## Commands
+## 命令
 
-### `orvix submit <script>`
+### `orvix submit <脚本>`
 
-Parse `#ORVIX` directives in the script, generate the translated script, and submit it.
+解析脚本中的 `#ORVIX` 指令，生成翻译后的脚本并提交。
 
 ```bash
 $ orvix submit case/job/serial/orvix_serial.sh
 12345678
 ```
 
-Options:
+选项：
 
 ```bash
-orvix submit --dry-run script.sh                    # Only print the translated script, do not submit
-orvix submit --scheduler=slurm script.sh            # Force a scheduler backend, overriding the script setting
-orvix submit --watch script.sh                      # Submit and poll status until the job finishes
-orvix submit --watch --watch-interval=10s script.sh # Custom polling interval (default: 5s)
+orvix submit --dry-run script.sh                    # 仅打印翻译后的脚本，不提交
+orvix submit --scheduler=slurm script.sh            # 强制指定调度器后端，覆盖脚本中的设置
+orvix submit --watch script.sh                      # 提交后持续轮询状态直到作业结束
+orvix submit --watch --watch-interval=10s script.sh # 自定义轮询间隔（默认：5s）
 ```
 
 ### `orvix status <info.yaml>`
 
-Query the job status.
+查询作业状态。
 
 ```bash
 $ orvix status case/job/serial/orvix_serial.info.yaml
@@ -211,7 +211,7 @@ RUNNING
 
 ### `orvix watch [flags] <info.yaml>`
 
-Poll job status repeatedly until the job reaches a terminal state (COMPLETED, FAILED, CANCELLED, TIMEOUT).
+持续轮询作业状态，直到作业到达终止状态（COMPLETED、FAILED、CANCELLED、TIMEOUT）。
 
 ```bash
 $ orvix watch case/job/serial/orvix_serial.info.yaml
@@ -220,36 +220,36 @@ $ orvix watch case/job/serial/orvix_serial.info.yaml
 [2026-05-22T10:02:00Z] COMPLETED
 ```
 
-Options:
+选项：
 
 ```bash
-orvix watch -i 10s case/job/serial/orvix_serial.info.yaml  # Poll every 10 seconds (default: 5s)
+orvix watch -i 10s case/job/serial/orvix_serial.info.yaml  # 每 10 秒轮询一次（默认：5s）
 ```
 
 ### `orvix kill <info.yaml>`
 
-Kill the job.
+终止作业。
 
 ```bash
 $ orvix kill case/job/serial/orvix_serial.info.yaml
 ```
 
-## Generated Files
+## 生成的文件
 
-After submitting `path/to/script.sh`, the following files are created in the **same directory**:
+提交 `path/to/script.sh` 后，会在**同一目录**下创建以下文件：
 
 ```
-path/to/script.sh              # original script (unchanged)
-path/to/script.sh.submit       # translated script actually executed
-path/to/script.sh.info.yaml    # job metadata (used by status / kill)
-path/to/script.sh.submit.log   # error log on submission failure (only on failure)
+path/to/script.sh              # 原始脚本（不变）
+path/to/script.sh.submit       # 实际执行的翻译后脚本
+path/to/script.sh.info.yaml    # 作业元数据（status / kill 使用）
+path/to/script.sh.submit.log   # 提交失败时的错误日志（仅失败时生成）
 ```
 
-- On successful submission, `.submit` and `.info.yaml` are generated.
-- On submission failure (e.g., parse error, scheduler rejection), an additional `.submit.log` is created recording the error and timestamp.
-- Resubmitting overwrites existing files with the same names. If the script has no extension, `.sh` is appended by default.
+- 提交成功时，会生成 `.submit` 和 `.info.yaml`。
+- 提交失败时（如解析错误、调度器拒绝），会额外生成 `.submit.log`，记录错误和时间戳。
+- 重新提交会覆盖同名现有文件。如果脚本无扩展名，默认追加 `.sh`。
 
-Example `info.yaml`:
+`info.yaml` 示例：
 
 ```yaml
 scheduler: slurm
@@ -269,36 +269,36 @@ directives:
       value: "2"
 ```
 
-## Supported Scheduler Backends
+## 支持的调度器后端
 
-| Backend | Description |
+| 后端 | 说明 |
 |---|---|
-| `slurm` | Translates to `#SBATCH` directives and submits via `sbatch` to a SLURM cluster |
-| `local` | Runs directly as a local subprocess, useful for local testing |
+| `slurm` | 转换为 `#SBATCH` 指令，通过 `sbatch` 提交到 SLURM 集群 |
+| `local` | 作为本地子进程直接运行，适用于本地测试 |
 
-### SLURM Directive Mapping
+### SLURM 指令映射
 
-When using `scheduler=slurm`, the mapping from orvix directives to SLURM directives is:
+使用 `scheduler=slurm` 时，orvix 指令到 SLURM 指令的映射如下：
 
-| orvix Directive | SLURM Directive | Description |
+| orvix 指令 | SLURM 指令 | 说明 |
 |---|---|---|
-| `job-name` | `--job-name` | Job name |
-| `output` | `--output` | Standard output file |
-| `error` | `--error` | Standard error file |
-| `nodes` | `--nodes` | Number of nodes |
-| `ntasks` | `--ntasks` | Total number of tasks |
-| `ntasks-per-node` | `--ntasks-per-node` | Tasks per node |
-| `cpus-per-task` | `--cpus-per-task` | CPUs per task |
-| `time` | `--time` | Time limit (`HH:MM:SS`) |
-| `queue` | `--partition` | Partition / queue |
-| `account` | `--account` | Billing account |
-| `project` | `--wckey` | Project task number |
-| `application` | `--comment` | Application name |
-| `exclusive` | `--exclusive` | Exclusive node access |
-| `nodelist` | `--nodelist` | Specific node list |
-| `memory` | `--mem` | Memory requirement |
-| `dependency` | `--dependency` | Job dependency |
+| `job-name` | `--job-name` | 作业名称 |
+| `output` | `--output` | 标准输出文件 |
+| `error` | `--error` | 标准错误文件 |
+| `nodes` | `--nodes` | 节点数量 |
+| `ntasks` | `--ntasks` | 任务总数 |
+| `ntasks-per-node` | `--ntasks-per-node` | 每节点任务数 |
+| `cpus-per-task` | `--cpus-per-task` | 每任务 CPU 数 |
+| `time` | `--time` | 时间限制（`HH:MM:SS`） |
+| `queue` | `--partition` | 分区 / 队列 |
+| `account` | `--account` | 计费账户 |
+| `project` | `--wckey` | 项目任务号 |
+| `application` | `--comment` | 应用名称 |
+| `exclusive` | `--exclusive` | 独占节点访问 |
+| `nodelist` | `--nodelist` | 指定节点列表 |
+| `memory` | `--mem` | 内存需求 |
+| `dependency` | `--dependency` | 作业依赖 |
 
-## License
+## 许可证
 
-orvix is licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+orvix 基于 [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0) 授权。
