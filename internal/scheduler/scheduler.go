@@ -39,6 +39,8 @@ func ByName(name string) (Scheduler, error) {
 		return &Local{}, nil
 	case "slurm":
 		return &SLURM{}, nil
+	case "donau":
+		return &Donau{}, nil
 	}
 	return nil, fmt.Errorf("unknown scheduler %q", name)
 }
