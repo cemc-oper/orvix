@@ -130,7 +130,7 @@ echo "running"
 
 | 指令 | 说明 | 示例 |
 |---|---|---|
-| `scheduler` | 选择调度器后端（`slurm` 或 `local`），默认 `local` | `scheduler=slurm` |
+| `scheduler` | 选择调度器后端（`slurm`、`donau` 或 `local`），默认 `local` | `scheduler=slurm` |
 | `job-name` | 作业名称 | `job-name=myjob` |
 | `queue` | 分区 / 队列 | `queue=normal` |
 
@@ -274,6 +274,7 @@ directives:
 | 后端 | 说明 |
 |---|---|
 | `slurm` | 转换为 `#SBATCH` 指令，通过 `sbatch` 提交到 SLURM 集群 |
+| `donau` | 转换为 `#DSUB` 指令，通过 `dsub` 提交到华为 Donau 调度系统 |
 | `local` | 作为本地子进程直接运行，适用于本地测试 |
 
 ### SLURM 指令映射
@@ -298,6 +299,30 @@ directives:
 | `nodelist` | `--nodelist` | 指定节点列表 |
 | `memory` | `--mem` | 内存需求 |
 | `dependency` | `--dependency` | 作业依赖 |
+
+### Donau 指令映射
+
+使用 `scheduler=donau` 时，orvix 指令到 Donau 指令的映射如下：
+
+| orvix 指令 | Donau 指令 | 说明 |
+|---|---|---|
+| `job-name` | `-n` | 作业名称 |
+| `output` | `-oo` | 标准输出文件 |
+| `error` | `-eo` | 标准错误文件 |
+| `nodes` | `-nn` | 节点数量 |
+| `ntasks-per-node` | `-tpn` | 每节点任务数 |
+| `cpus-per-task` | `-R "cpu=X"` | 每任务 CPU 数（与 `memory` 合并为一条 `-R` 指令） |
+| `memory` | `-R "mem=Y"` | 内存需求（与 `cpus-per-task` 合并为一条 `-R` 指令） |
+| `time` | `-T` | 时间限制（`HH:MM:SS` 自动转换为秒；时长字符串如 `8h` 原样传递） |
+| `queue` | `-q` | 队列 |
+| `account` | `-A` | 账户 |
+| `project` | `-d` | 项目号（与 `application` 合并为 `-d "project:application"`） |
+| `application` | `-d` | 应用名称（与 `project` 合并为 `-d "project:application"`） |
+| `exclusive` | `--exclusive` | 独占节点访问（可带值或不带值） |
+| `nodelist` | `-pn` | 指定节点列表（自动加引号） |
+| `job-type` | `--job_type` | 作业类型 |
+
+注意：`ntasks` 和 `dependency` 在 Donau 中无对应指令，会被静默忽略。
 
 ## 许可证
 
