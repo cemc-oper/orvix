@@ -16,115 +16,134 @@ type Donau struct{}
 
 func (d *Donau) Name() string { return "donau" }
 
-// donauSimpleMapping describes a straightforward 1:1 directive-to-flag mapping.
-type donauSimpleMapping struct {
-	key      string // orvix directive name
-	flag     string // Donau flag (without leading - or --)
-	double   bool   // true if the flag needs -- prefix (e.g. --job_type)
-	quote    bool   // whether the value should be quoted
-	optional bool   // true if the directive may be omitted when value is empty
+// dsub returns a Generator that emits "#DSUB -flag value".
+// The line is skipped when the orvix value is empty.
+func dsub(orvixKey, flag string) Generator {
+	return func(d *directive.Set) (string, bool) {
+		v, ok := d.GetOK(orvixKey)
+		if !ok || v == "" {
+			return "", false
+		}
+		return fmt.Sprintf("#DSUB -%s %s", flag, v), true
+	}
+}
+
+// dsubQ returns a Generator that emits "#DSUB -flag 'value'"
+// with the value wrapped in single quotes.
+func dsubQ(orvixKey, flag string) Generator {
+	return func(d *directive.Set) (string, bool) {
+		v, ok := d.GetOK(orvixKey)
+		if !ok || v == "" {
+			return "", false
+		}
+		return fmt.Sprintf("#DSUB -%s '%s'", flag, v), true
+	}
+}
+
+// dsubDouble returns a Generator that emits "#DSUB --flag value".
+func dsubDouble(orvixKey, flag string) Generator {
+	return func(d *directive.Set) (string, bool) {
+		v, ok := d.GetOK(orvixKey)
+		if !ok || v == "" {
+			return "", false
+		}
+		return fmt.Sprintf("#DSUB --%s %s", flag, v), true
+	}
+}
+
+// dsubBare returns a Generator for bare Donau flags.
+// When the orvix value is empty it emits "#DSUB --flag";
+// otherwise "#DSUB --flag value".
+func dsubBare(orvixKey, flag string) Generator {
+	return func(d *directive.Set) (string, bool) {
+		v, ok := d.GetOK(orvixKey)
+		if !ok {
+			return "", false
+		}
+		if v == "" {
+			return fmt.Sprintf("#DSUB --%s", flag), true
+		}
+		return fmt.Sprintf("#DSUB --%s %s", flag, v), true
+	}
+}
+
+// donauTime handles the special time-conversion logic.
+func donauTime(d *directive.Set) (string, bool) {
+	v, ok := d.GetOK("time")
+	if !ok || v == "" {
+		return "", false
+	}
+	if sec, err := timeToSeconds(v); err == nil {
+		return fmt.Sprintf("#DSUB -T %d", sec), true
+	}
+	return fmt.Sprintf("#DSUB -T %s", v), true
+}
+
+// donauResources merges cpus-per-task and memory into a single -R line.
+func donauResources(d *directive.Set) (string, bool) {
+	var parts []string
+	if v, ok := d.GetOK("cpus-per-task"); ok && v != "" {
+		parts = append(parts, fmt.Sprintf("cpu=%s", v))
+	}
+	if v, ok := d.GetOK("memory"); ok && v != "" {
+		parts = append(parts, fmt.Sprintf("mem=%s", v))
+	}
+	if len(parts) == 0 {
+		return "", false
+	}
+	return fmt.Sprintf(`#DSUB -R "%s"`, strings.Join(parts, ";")), true
+}
+
+// donauDescription merges project and application into a single -d line.
+func donauDescription(d *directive.Set) (string, bool) {
+	proj, hasProj := d.GetOK("project")
+	app, hasApp := d.GetOK("application")
+	if !hasProj && !hasApp {
+		return "", false
+	}
+	if proj != "" && app != "" {
+		return fmt.Sprintf(`#DSUB -d "%s:%s"`, proj, app), true
+	}
+	if proj != "" {
+		return fmt.Sprintf(`#DSUB -d "%s"`, proj), true
+	}
+	return fmt.Sprintf(`#DSUB -d "%s"`, app), true
 }
 
 // PreambleFor translates orvix generic directives to #DSUB lines.
 //
-// Special handling that breaks the naive 1:1 pattern:
-//   - project + application are combined into a single -d "project:application" line.
-//   - cpus-per-task and memory are merged into a single -R "cpu=X;mem=Y" line.
-//   - time is converted to seconds when it looks like HH:MM:SS or MM:SS;
-//     otherwise it is passed through (Donau also accepts duration strings like 8h).
-//   - ntasks has no Donau equivalent and is silently skipped.
-//   - dependency has no Donau equivalent and is silently skipped.
+// Each generator queries the directive set for the orvix keys it cares about
+// and emits one scheduler-specific line. Generators that find nothing return
+// ("", false) and are skipped.
+//
+// Special handling:
+//   - project + application are combined into a single -d line.
+//   - cpus-per-task and memory are merged into a single -R line.
+//   - time is converted to seconds when possible.
+//   - ntasks and dependency have no Donau equivalent — skipped silently.
 func (d *Donau) PreambleFor(ds *directive.Set) ([]string, error) {
+	generators := []Generator{
+		dsub("job-name", "n"),
+		dsub("output", "oo"),
+		dsub("error", "eo"),
+		dsub("nodes", "nn"),
+		dsub("ntasks-per-node", "tpn"),
+		dsub("queue", "q"),
+		dsub("account", "A"),
+		dsubQ("nodelist", "pn"),
+		dsubDouble("job-type", "job_type"),
+		donauTime,
+		donauResources,   // merges cpus-per-task + memory
+		donauDescription, // merges project + application
+		dsubBare("exclusive", "exclusive"),
+	}
+
 	var lines []string
-
-	// Emit simple 1:1 mappings in a stable order.
-	simples := []donauSimpleMapping{
-		{"job-name", "n", false, false, true},
-		{"output", "oo", false, false, true},
-		{"error", "eo", false, false, true},
-		{"nodes", "nn", false, false, true},
-		{"ntasks-per-node", "tpn", false, false, true},
-		{"queue", "q", false, false, true},
-		{"account", "A", false, false, true},
-		{"nodelist", "pn", false, true, true},
-	}
-
-	for _, m := range simples {
-		if !ds.Has(m.key) {
-			continue
-		}
-		val := ds.Get(m.key)
-		if m.optional && val == "" {
-			continue
-		}
-		prefix := "-"
-		if m.double {
-			prefix = "--"
-		}
-		if m.quote {
-			lines = append(lines, fmt.Sprintf("#DSUB %s%s '%s'", prefix, m.flag, val))
-		} else {
-			lines = append(lines, fmt.Sprintf("#DSUB %s%s %s", prefix, m.flag, val))
+	for _, gen := range generators {
+		if line, ok := gen(ds); ok {
+			lines = append(lines, line)
 		}
 	}
-
-	// job-type: --job_type [value].
-	if ds.Has("job-type") {
-		val := ds.Get("job-type")
-		if val != "" {
-			lines = append(lines, fmt.Sprintf("#DSUB --job_type %s", val))
-		}
-	}
-
-	// time: -T (convert HH:MM:SS / MM:SS to seconds; pass through otherwise).
-	if ds.Has("time") {
-		t := ds.Get("time")
-		if sec, err := timeToSeconds(t); err == nil {
-			lines = append(lines, fmt.Sprintf("#DSUB -T %d", sec))
-		} else {
-			lines = append(lines, fmt.Sprintf("#DSUB -T %s", t))
-		}
-	}
-
-	// Build the combined -R resource line from cpus-per-task and memory.
-	var resParts []string
-	if ds.Has("cpus-per-task") {
-		resParts = append(resParts, fmt.Sprintf("cpu=%s", ds.Get("cpus-per-task")))
-	}
-	if ds.Has("memory") {
-		resParts = append(resParts, fmt.Sprintf("mem=%s", ds.Get("memory")))
-	}
-	if len(resParts) > 0 {
-		lines = append(lines, fmt.Sprintf("#DSUB -R \"%s\"", strings.Join(resParts, ";")))
-	}
-
-	// project + application combined into a single -d line.
-	hasProj := ds.Has("project")
-	hasApp := ds.Has("application")
-	if hasProj || hasApp {
-		proj := ds.Get("project")
-		app := ds.Get("application")
-		if proj != "" && app != "" {
-			lines = append(lines, fmt.Sprintf("#DSUB -d \"%s:%s\"", proj, app))
-		} else if proj != "" {
-			lines = append(lines, fmt.Sprintf("#DSUB -d \"%s\"", proj))
-		} else if app != "" {
-			lines = append(lines, fmt.Sprintf("#DSUB -d \"%s\"", app))
-		}
-	}
-
-	// exclusive: --exclusive [value]
-	if ds.Has("exclusive") {
-		val := ds.Get("exclusive")
-		if val == "" {
-			lines = append(lines, "#DSUB --exclusive")
-		} else {
-			lines = append(lines, fmt.Sprintf("#DSUB --exclusive %s", val))
-		}
-	}
-
-	// ntasks and dependency have no Donau equivalent — skip silently.
-
 	log.Debugf("[donau] preamble: %d line(s)", len(lines))
 	return lines, nil
 }

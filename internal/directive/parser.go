@@ -70,6 +70,16 @@ func (s *Set) Has(key string) bool {
 	return ok
 }
 
+// GetOK returns the value for a key together with an ok flag.
+// If the key is absent, it returns ("", false).
+func (s *Set) GetOK(key string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+	v, ok := s.byKey[key]
+	return v, ok
+}
+
 // Scheduler returns the scheduler= value, defaulting to "local".
 func (s *Set) Scheduler() string {
 	v := s.Get("scheduler")

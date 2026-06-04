@@ -7,6 +7,10 @@ import (
 	"github.com/cemc-oper/orvix/internal/directive"
 )
 
+// Generator generates a single scheduler directive line from an orvix directive set.
+// It returns the generated line and true if the line should be emitted.
+type Generator func(d *directive.Set) (string, bool)
+
 // Scheduler is the contract every backend must satisfy.
 type Scheduler interface {
 	// Name is the canonical scheduler name (e.g. "slurm", "local").

@@ -15,50 +15,75 @@ type SLURM struct{}
 
 func (s *SLURM) Name() string { return "slurm" }
 
-// slurmFlag maps every orvix generic directive name to its SLURM long-flag
-// name. An empty value means the directive has no SLURM equivalent and is
-// silently skipped. Entries whose key and value are identical are listed
-// explicitly for clarity and auditability.
-var slurmFlag = map[string]string{
-	"scheduler":       "",                // consumed by orvix
-	"job-name":        "job-name",        // --job-name
-	"output":          "output",          // --output
-	"error":           "error",           // --error
-	"nodes":           "nodes",           // --nodes
-	"ntasks":          "ntasks",          // --ntasks
-	"ntasks-per-node": "ntasks-per-node", // --ntasks-per-node
-	"cpus-per-task":   "cpus-per-task",   // --cpus-per-task
-	"time":            "time",            // --time
-	"queue":           "partition",       // --partition
-	"account":         "account",         // --account
-	"project":         "wckey",           // --wckey
-	"application":     "comment",         // --comment
-	"exclusive":       "exclusive",       // --exclusive
-	"nodelist":        "nodelist",        // --nodelist
-	"job-type":        "",                // no SLURM equivalent
-	"memory":          "mem",             // --mem
-	"dependency":      "dependency",      // --dependency
+// sbatch returns a Generator that emits "#SBATCH --flag=value".
+// The value is passed through unchanged (no quoting).
+func sbatch(orvixKey, flag string) Generator {
+	return func(d *directive.Set) (string, bool) {
+		v, ok := d.GetOK(orvixKey)
+		if !ok {
+			return "", false
+		}
+		return fmt.Sprintf("#SBATCH --%s=%s", flag, v), true
+	}
+}
+
+// sbatchQ returns a Generator that emits "#SBATCH --flag=value"
+// with the value wrapped in double quotes when it contains whitespace.
+func sbatchQ(orvixKey, flag string) Generator {
+	return func(d *directive.Set) (string, bool) {
+		v, ok := d.GetOK(orvixKey)
+		if !ok {
+			return "", false
+		}
+		return fmt.Sprintf("#SBATCH --%s=%s", flag, slurmQuote(v)), true
+	}
+}
+
+// sbatchBare returns a Generator for bare SLURM flags.
+// When the orvix value is empty it emits "#SBATCH --flag";
+// otherwise "#SBATCH --flag=value".
+func sbatchBare(orvixKey, flag string) Generator {
+	return func(d *directive.Set) (string, bool) {
+		v, ok := d.GetOK(orvixKey)
+		if !ok {
+			return "", false
+		}
+		if v == "" {
+			return fmt.Sprintf("#SBATCH --%s", flag), true
+		}
+		return fmt.Sprintf("#SBATCH --%s=%s", flag, v), true
+	}
 }
 
 // PreambleFor translates orvix generic directives to #SBATCH lines.
 //
-// Each known directive is mapped via slurmFlag (e.g. project -> --wckey).
-// Directives with no SLURM equivalent (job-type) are silently skipped.
-// Bare keys emit #SBATCH --flag; values with whitespace are double-quoted.
+// Each generator queries the directive set for the orvix keys it cares about
+// and emits one scheduler-specific line. Generators that find nothing return
+// ("", false) and are skipped.
 func (s *SLURM) PreambleFor(d *directive.Set) ([]string, error) {
+	generators := []Generator{
+		sbatchQ("job-name", "job-name"),
+		sbatchQ("output", "output"),
+		sbatchQ("error", "error"),
+		sbatch("nodes", "nodes"),
+		sbatch("ntasks", "ntasks"),
+		sbatch("ntasks-per-node", "ntasks-per-node"),
+		sbatch("cpus-per-task", "cpus-per-task"),
+		sbatch("time", "time"),
+		sbatchQ("queue", "partition"),
+		sbatchQ("account", "account"),
+		sbatchQ("project", "wckey"),
+		sbatchQ("application", "comment"),
+		sbatchBare("exclusive", "exclusive"),
+		sbatchQ("nodelist", "nodelist"),
+		sbatch("memory", "mem"),
+		sbatch("dependency", "dependency"),
+	}
+
 	var lines []string
-	for _, item := range d.Items {
-		flag := item.Key
-		if mapped, ok := slurmFlag[item.Key]; ok {
-			if mapped == "" {
-				continue // skip directives with no SLURM equivalent
-			}
-			flag = mapped
-		}
-		if item.Value == "" {
-			lines = append(lines, fmt.Sprintf("#SBATCH --%s", flag))
-		} else {
-			lines = append(lines, fmt.Sprintf("#SBATCH --%s=%s", flag, slurmQuote(item.Value)))
+	for _, gen := range generators {
+		if line, ok := gen(d); ok {
+			lines = append(lines, line)
 		}
 	}
 	log.Debugf("[slurm] preamble: %d line(s)", len(lines))
