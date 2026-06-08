@@ -30,3 +30,6 @@ go.work.sum
 Thumbs.db
 
 bin/
+
+vendor/
+vendor.tar.gz

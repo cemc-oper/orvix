@@ -6,6 +6,8 @@ orvix 是一个用于向 HPC 集群提交脚本作业的命令行工具。
 
 ## 安装
 
+### 常规构建
+
 在 Linux 上，可直接使用 Makefile 构建：
 
 ```bash
@@ -13,6 +15,45 @@ make build
 ```
 
 构建成功后，将生成二进制文件 `bin/orvix`。
+
+### 离线构建（Vendor 模式）
+
+对于无法连接互联网的 HPC 环境，可以使用 vendor 模式进行离线编译：
+
+**1. 在有网络的机器上准备 vendor 目录：**
+
+```bash
+cd repo/orvix
+make vendor          # 将依赖下载到 vendor/ 目录
+```
+
+**2. 将代码连同 vendor/ 目录复制到目标 HPC：**
+
+```bash
+# 方式一：打包后上传
+tar czf orvix.tar.gz repo/orvix/
+# 在 HPC 上解压后编译
+
+# 方式二：如果代码已存在于 HPC 但无法联网更新依赖
+# 只需将 vendor/ 目录复制到 repo/orvix/ 下即可
+```
+
+**3. 在 HPC 上编译：**
+
+```bash
+cd repo/orvix
+make build           # 自动检测 vendor/ 存在，使用 -mod=vendor
+```
+
+Makefile 会自动检测 `vendor/modules.txt` 是否存在，如果存在则自动添加 `-mod=vendor` 标志。
+
+**其他常用目标：**
+
+```bash
+make vendor-clean    # 删除 vendor/ 目录
+make test            # 运行单元测试（也会自动使用 vendor 模式）
+make build-all       # 为所有平台交叉编译
+```
 
 ## 快速开始
 
