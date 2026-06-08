@@ -1,8 +1,10 @@
 package scheduler
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/cemc-oper/orvix/internal/directive"
 )
@@ -10,9 +12,7 @@ import (
 func mustParse(t *testing.T, src string) *directive.Set {
 	t.Helper()
 	set, err := directive.ParseWithOverride([]byte(src), "donau")
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 	return set
 }
 
@@ -29,9 +29,7 @@ func TestDonauPreambleSimpleMappings(t *testing.T) {
 	set := mustParse(t, src)
 	d := &Donau{}
 	lines, err := d.PreambleFor(set)
-	if err != nil {
-		t.Fatalf("PreambleFor error: %v", err)
-	}
+	require.NoError(t, err)
 
 	want := []string{
 		"#DSUB -n myjob",
@@ -42,9 +40,7 @@ func TestDonauPreambleSimpleMappings(t *testing.T) {
 		"#DSUB -q operation",
 		"#DSUB -A operation",
 	}
-	if !slicesEqual(lines, want) {
-		t.Errorf("got %v, want %v", lines, want)
-	}
+	assert.Equal(t, want, lines)
 }
 
 func TestDonauPreambleProjectApplicationCombined(t *testing.T) {
@@ -82,12 +78,8 @@ func TestDonauPreambleProjectApplicationCombined(t *testing.T) {
 			set := mustParse(t, tc.src)
 			d := &Donau{}
 			got, err := d.PreambleFor(set)
-			if err != nil {
-				t.Fatalf("PreambleFor error: %v", err)
-			}
-			if !slicesEqual(got, tc.want) {
-				t.Errorf("got %v, want %v", got, tc.want)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
@@ -127,12 +119,8 @@ func TestDonauPreambleResourceLine(t *testing.T) {
 			set := mustParse(t, tc.src)
 			d := &Donau{}
 			got, err := d.PreambleFor(set)
-			if err != nil {
-				t.Fatalf("PreambleFor error: %v", err)
-			}
-			if !slicesEqual(got, tc.want) {
-				t.Errorf("got %v, want %v", got, tc.want)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
@@ -164,12 +152,8 @@ func TestDonauPreambleExclusive(t *testing.T) {
 			set := mustParse(t, tc.src)
 			d := &Donau{}
 			got, err := d.PreambleFor(set)
-			if err != nil {
-				t.Fatalf("PreambleFor error: %v", err)
-			}
-			if !slicesEqual(got, tc.want) {
-				t.Errorf("got %v, want %v", got, tc.want)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
@@ -182,35 +166,35 @@ func TestDonauPreambleTime(t *testing.T) {
 	}{
 		{
 			name: "pure seconds",
-			src:  `#!/bin/bash
+			src: `#!/bin/bash
 #ORVIX time=88000
 `,
 			want: "#DSUB -T 88000",
 		},
 		{
 			name: "HH:MM:SS",
-			src:  `#!/bin/bash
+			src: `#!/bin/bash
 #ORVIX time=01:00:00
 `,
 			want: "#DSUB -T 3600",
 		},
 		{
 			name: "MM:SS",
-			src:  `#!/bin/bash
+			src: `#!/bin/bash
 #ORVIX time=05:30
 `,
 			want: "#DSUB -T 330",
 		},
 		{
 			name: "duration string 8h",
-			src:  `#!/bin/bash
+			src: `#!/bin/bash
 #ORVIX time=8h
 `,
 			want: "#DSUB -T 8h",
 		},
 		{
 			name: "duration string 1h30m",
-			src:  `#!/bin/bash
+			src: `#!/bin/bash
 #ORVIX time=1h30m
 `,
 			want: "#DSUB -T 1h30m",
@@ -222,12 +206,9 @@ func TestDonauPreambleTime(t *testing.T) {
 			set := mustParse(t, tc.src)
 			d := &Donau{}
 			got, err := d.PreambleFor(set)
-			if err != nil {
-				t.Fatalf("PreambleFor error: %v", err)
-			}
-			if len(got) != 1 || got[0] != tc.want {
-				t.Errorf("got %v, want [%q]", got, tc.want)
-			}
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			assert.Equal(t, tc.want, got[0])
 		})
 	}
 }
@@ -239,12 +220,8 @@ func TestDonauPreambleSkipsNtasks(t *testing.T) {
 	set := mustParse(t, src)
 	d := &Donau{}
 	lines, err := d.PreambleFor(set)
-	if err != nil {
-		t.Fatalf("PreambleFor error: %v", err)
-	}
-	if len(lines) != 0 {
-		t.Errorf("expected 0 lines for ntasks-only, got %v", lines)
-	}
+	require.NoError(t, err)
+	assert.Empty(t, lines, "expected 0 lines for ntasks-only")
 }
 
 func TestDonauPreambleJobType(t *testing.T) {
@@ -254,13 +231,8 @@ func TestDonauPreambleJobType(t *testing.T) {
 	set := mustParse(t, src)
 	d := &Donau{}
 	lines, err := d.PreambleFor(set)
-	if err != nil {
-		t.Fatalf("PreambleFor error: %v", err)
-	}
-	want := []string{"#DSUB --job_type cosched"}
-	if !slicesEqual(lines, want) {
-		t.Errorf("got %v, want %v", lines, want)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, []string{"#DSUB --job_type cosched"}, lines)
 }
 
 func TestDonauPreambleNodelistQuoted(t *testing.T) {
@@ -270,13 +242,8 @@ func TestDonauPreambleNodelistQuoted(t *testing.T) {
 	set := mustParse(t, src)
 	d := &Donau{}
 	lines, err := d.PreambleFor(set)
-	if err != nil {
-		t.Fatalf("PreambleFor error: %v", err)
-	}
-	want := []string{"#DSUB -pn 'rp_cme001-418'"}
-	if !slicesEqual(lines, want) {
-		t.Errorf("got %v, want %v", lines, want)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, []string{"#DSUB -pn 'rp_cme001-418'"}, lines)
 }
 
 func TestDonauPreambleFullParallel(t *testing.T) {
@@ -301,9 +268,7 @@ func TestDonauPreambleFullParallel(t *testing.T) {
 	set := mustParse(t, src)
 	d := &Donau{}
 	lines, err := d.PreambleFor(set)
-	if err != nil {
-		t.Fatalf("PreambleFor error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Build a set for quick membership checks.
 	have := make(map[string]bool)
@@ -327,16 +292,12 @@ func TestDonauPreambleFullParallel(t *testing.T) {
 		`#DSUB -d "105-00-02:GRAPES"`,
 	}
 	for _, w := range mustHave {
-		if !have[w] {
-			t.Errorf("missing expected line: %s", w)
-		}
+		assert.True(t, have[w], "missing expected line: %s", w)
 	}
 
 	// Ensure ntasks is NOT present (it has no Donau equivalent).
 	for _, l := range lines {
-		if strings.Contains(l, "ntasks") {
-			t.Errorf("unexpected ntasks line: %s", l)
-		}
+		assert.NotContains(t, l, "ntasks", "unexpected ntasks line: %s", l)
 	}
 }
 
@@ -359,9 +320,7 @@ func TestDonauPreambleSerial(t *testing.T) {
 	set := mustParse(t, src)
 	d := &Donau{}
 	lines, err := d.PreambleFor(set)
-	if err != nil {
-		t.Fatalf("PreambleFor error: %v", err)
-	}
+	require.NoError(t, err)
 
 	have := make(map[string]bool)
 	for _, l := range lines {
@@ -379,9 +338,7 @@ func TestDonauPreambleSerial(t *testing.T) {
 		`#DSUB -d "105-00-02:GRAPES"`,
 	}
 	for _, w := range mustHave {
-		if !have[w] {
-			t.Errorf("missing expected line: %s", w)
-		}
+		assert.True(t, have[w], "missing expected line: %s", w)
 	}
 }
 
@@ -416,21 +373,7 @@ func TestDonauNormalizeState(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.raw, func(t *testing.T) {
 			got := d.NormalizeState(tc.raw)
-			if got != tc.want {
-				t.Errorf("NormalizeState(%q) = %q, want %q", tc.raw, got, tc.want)
-			}
+			assert.Equal(t, tc.want, got)
 		})
 	}
-}
-
-func slicesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

@@ -30,6 +30,13 @@ make build
 echo "Hello from HPC"
 ```
 
+使用 `orvix generate` 仅生成提交脚本（不提交）：
+
+```bash
+$ orvix generate myjob.sh
+Generated: /abs/path/myjob.sh.submit
+```
+
 使用 `orvix submit` 提交脚本：
 
 ```bash
@@ -78,18 +85,23 @@ $ orvix submit --watch myjob.sh
 
 ```mermaid
 flowchart TD
-    A[用户脚本<br/>#ORVIX 指令] --> B[orvix submit]
-    B --> C[解析 #ORVIX 指令]
+    A[用户脚本<br/>#ORVIX 指令] --> B{orvix submit<br/>or generate?}
+    B -->|generate| C[解析 #ORVIX 指令]
     C --> D[选择调度器后端]
     D --> E[生成翻译后的脚本]
+    E --> G[写入 .submit 文件]
+    G --> N[完成]
+    B -->|submit| C
     E --> F{dry-run?}
-    F -->|是| G[打印脚本]
+    F -->|是| P[打印脚本]
+    P --> N
     F -->|否| H[提交到调度器]
     H --> I[输出作业 ID]
     I --> J[生成 .info.yaml]
     J --> K{--watch?}
     K -->|是| L[轮询状态直到结束]
-    K -->|否| M[完成]
+    K -->|否| N
+    L --> N
 ```
 
 ## 指令语法
@@ -182,6 +194,22 @@ echo "running"
 
 ## 命令
 
+### `orvix generate [flags] <脚本>`
+
+解析脚本中的 `#ORVIX` 指令，生成翻译后的脚本并写入 `.submit` 文件，**不提交**到调度器，也不生成 `.info.yaml`。
+
+```bash
+$ orvix generate case/job/serial/orvix_serial.sh
+Generated: /abs/path/orvix_serial.sh.submit
+```
+
+选项：
+
+```bash
+orvix generate --scheduler=slurm script.sh            # 强制指定调度器后端
+orvix generate --output-script=/tmp/submit.sh script.sh  # 自定义输出路径
+```
+
 ### `orvix submit <脚本>`
 
 解析脚本中的 `#ORVIX` 指令，生成翻译后的脚本并提交。
@@ -236,18 +264,31 @@ $ orvix kill case/job/serial/orvix_serial.info.yaml
 
 ## 生成的文件
 
+### `orvix submit` 生成的文件
+
 提交 `path/to/script.sh` 后，会在**同一目录**下创建以下文件：
 
 ```
 path/to/script.sh              # 原始脚本（不变）
 path/to/script.sh.submit       # 实际执行的翻译后脚本
-path/to/script.sh.info.yaml    # 作业元数据（status / kill 使用）
+path/to/script.sh.info.yaml    # 作业元数据（status / kill / watch 使用）
 path/to/script.sh.submit.log   # 提交失败时的错误日志（仅失败时生成）
 ```
 
 - 提交成功时，会生成 `.submit` 和 `.info.yaml`。
 - 提交失败时（如解析错误、调度器拒绝），会额外生成 `.submit.log`，记录错误和时间戳。
-- 重新提交会覆盖同名现有文件。如果脚本无扩展名，默认追加 `.sh`。
+- 重新提交会覆盖同名现有文件。
+
+### `orvix generate` 生成的文件
+
+`orvix generate` 仅生成 `.submit` 文件，**不**生成 `.info.yaml`：
+
+```
+path/to/script.sh              # 原始脚本（不变）
+path/to/script.sh.submit       # 翻译后的脚本
+```
+
+适用于需要预生成脚本、手动检查后再提交的场景。
 
 `info.yaml` 示例：
 

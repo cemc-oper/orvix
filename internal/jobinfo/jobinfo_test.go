@@ -3,9 +3,11 @@ package jobinfo
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/cemc-oper/orvix/internal/directive"
 )
@@ -29,14 +31,12 @@ func TestWriteRoundtrip(t *testing.T) {
 			{Key: "exclusive"},
 		},
 	}
-	if err := Write(p, info); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, Write(p, info))
+
 	data, err := os.ReadFile(p)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	s := string(data)
+
 	for _, want := range []string{
 		"scheduler: slurm",
 		`job_id: "12345"`,
@@ -44,16 +44,12 @@ func TestWriteRoundtrip(t *testing.T) {
 		"submit_dir: /abs",
 		"- key: scheduler",
 	} {
-		if !strings.Contains(s, want) {
-			t.Errorf("yaml missing %q\n--- yaml ---\n%s", want, s)
-		}
+		assert.Contains(t, s, want, "yaml missing %q", want)
 	}
 }
 
 func TestFromDirectivesNil(t *testing.T) {
-	if got := FromDirectives(nil); got != nil {
-		t.Errorf("FromDirectives(nil) = %v, want nil", got)
-	}
+	assert.Nil(t, FromDirectives(nil))
 }
 
 func TestFromDirectivesPreservesOrder(t *testing.T) {
@@ -62,19 +58,13 @@ func TestFromDirectivesPreservesOrder(t *testing.T) {
 #ORVIX nodes=2
 `)
 	set, err := directive.Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	got := FromDirectives(set)
-	want := []string{"scheduler", "queue", "nodes"}
-	if len(got) != len(want) {
-		t.Fatalf("len(got) = %d, want %d", len(got), len(want))
-	}
-	for i, w := range want {
-		if got[i].Key != w {
-			t.Errorf("got[%d].Key = %q, want %q", i, got[i].Key, w)
-		}
-	}
+	require.Len(t, got, 3)
+	assert.Equal(t, "scheduler", got[0].Key)
+	assert.Equal(t, "queue", got[1].Key)
+	assert.Equal(t, "nodes", got[2].Key)
 }
 
 func TestReadRoundtrip(t *testing.T) {
@@ -95,56 +85,35 @@ func TestReadRoundtrip(t *testing.T) {
 			{Key: "queue", Value: "normal"},
 		},
 	}
-	if err := Write(p, want); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, Write(p, want))
+
 	got, err := Read(p)
-	if err != nil {
-		t.Fatalf("Read: %v", err)
-	}
-	if got.Scheduler != want.Scheduler ||
-		got.JobID != want.JobID ||
-		got.ScriptSource != want.ScriptSource ||
-		got.ScriptGenerated != want.ScriptGenerated ||
-		got.SubmitDir != want.SubmitDir ||
-		got.Hostname != want.Hostname ||
-		got.User != want.User {
-		t.Errorf("Read scalar fields differ:\n got=%+v\nwant=%+v", got, want)
-	}
-	if !got.SubmittedAt.Equal(want.SubmittedAt) {
-		t.Errorf("SubmittedAt got=%v want=%v", got.SubmittedAt, want.SubmittedAt)
-	}
-	if len(got.Directives) != len(want.Directives) {
-		t.Fatalf("directives len got=%d want=%d", len(got.Directives), len(want.Directives))
-	}
-	for i := range got.Directives {
-		if got.Directives[i] != want.Directives[i] {
-			t.Errorf("Directives[%d] got=%+v want=%+v", i, got.Directives[i], want.Directives[i])
-		}
-	}
+	require.NoError(t, err)
+
+	assert.Equal(t, want.Scheduler, got.Scheduler)
+	assert.Equal(t, want.JobID, got.JobID)
+	assert.Equal(t, want.ScriptSource, got.ScriptSource)
+	assert.Equal(t, want.ScriptGenerated, got.ScriptGenerated)
+	assert.Equal(t, want.SubmitDir, got.SubmitDir)
+	assert.Equal(t, want.Hostname, got.Hostname)
+	assert.Equal(t, want.User, got.User)
+	assert.True(t, got.SubmittedAt.Equal(want.SubmittedAt))
+	assert.Equal(t, want.Directives, got.Directives)
 }
 
 func TestReadMissingScheduler(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "noschedver.yaml")
 	// YAML lacks scheduler field; consumers should treat it as default ("local").
-	if err := os.WriteFile(p, []byte("job_id: \"1\"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(p, []byte("job_id: \"1\"\n"), 0o644))
+
 	got, err := Read(p)
-	if err != nil {
-		t.Fatalf("Read: %v", err)
-	}
-	if got.Scheduler != "" {
-		t.Errorf("Scheduler got=%q want empty", got.Scheduler)
-	}
-	if got.JobID != "1" {
-		t.Errorf("JobID got=%q want %q", got.JobID, "1")
-	}
+	require.NoError(t, err)
+	assert.Empty(t, got.Scheduler)
+	assert.Equal(t, "1", got.JobID)
 }
 
 func TestReadMissing(t *testing.T) {
-	if _, err := Read(filepath.Join(t.TempDir(), "nope.yaml")); err == nil {
-		t.Fatal("Read: expected error for missing file, got nil")
-	}
+	_, err := Read(filepath.Join(t.TempDir(), "nope.yaml"))
+	require.Error(t, err, "expected error for missing file")
 }

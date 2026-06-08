@@ -57,7 +57,7 @@ func Generate(opts GenerateOptions) (string, error) {
 	}
 	log.Debugf("[generate] using scheduler: %s", sched.Name())
 
-	generated, err := script.Generate(src, directives, sched)
+	generated, err := script.Render(src, directives, sched)
 	if err != nil {
 		return "", wrap(fmt.Errorf("generate script: %w", err))
 	}

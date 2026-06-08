@@ -12,12 +12,12 @@ import (
 	"github.com/cemc-oper/orvix/internal/scheduler"
 )
 
-// Generate produces a runnable script for the given scheduler:
+// Render produces a runnable script for the given scheduler:
 //   - Preserves the shebang on the first line
 //   - Inserts the scheduler-specific preamble (e.g. #SBATCH lines)
 //   - Strips the original `#ORVIX ...` lines
 //   - Keeps the rest of the script intact
-func Generate(src []byte, d *directive.Set, sched scheduler.Scheduler) ([]byte, error) {
+func Render(src []byte, d *directive.Set, sched scheduler.Scheduler) ([]byte, error) {
 	preamble, err := sched.PreambleFor(d)
 	if err != nil {
 		return nil, err

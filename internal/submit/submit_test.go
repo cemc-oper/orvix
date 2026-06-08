@@ -2,6 +2,10 @@ package submit
 
 import "testing"
 
+import (
+	"github.com/stretchr/testify/assert"
+)
+
 func TestDerivePaths(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -79,12 +83,8 @@ func TestDerivePaths(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			gotScript, gotYaml := derivePaths(tc.orig, tc.outScript, tc.outInfo)
-			if gotScript != tc.wantScript {
-				t.Errorf("script: got %q, want %q", gotScript, tc.wantScript)
-			}
-			if gotYaml != tc.wantYaml {
-				t.Errorf("yaml: got %q, want %q", gotYaml, tc.wantYaml)
-			}
+			assert.Equal(t, tc.wantScript, gotScript)
+			assert.Equal(t, tc.wantYaml, gotYaml)
 		})
 	}
 }

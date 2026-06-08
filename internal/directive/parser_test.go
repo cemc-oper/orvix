@@ -1,6 +1,11 @@
 package directive
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestParseBasic(t *testing.T) {
 	src := []byte(`#!/bin/bash
@@ -11,18 +16,10 @@ func TestParseBasic(t *testing.T) {
 echo "hello"
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := set.Scheduler(); got != "slurm" {
-		t.Errorf("scheduler = %q, want slurm", got)
-	}
-	if got := set.Get("nodes"); got != "2" {
-		t.Errorf("nodes = %q, want 2", got)
-	}
-	if got := set.Get("time"); got != "01:00:00" {
-		t.Errorf("time = %q, want 01:00:00", got)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "slurm", set.Scheduler())
+	assert.Equal(t, "2", set.Get("nodes"))
+	assert.Equal(t, "01:00:00", set.Get("time"))
 }
 
 func TestParseBareKey(t *testing.T) {
@@ -30,18 +27,10 @@ func TestParseBareKey(t *testing.T) {
 #ORVIX nodes=2
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !set.Has("exclusive") {
-		t.Error("exclusive should be set")
-	}
-	if got := set.Get("exclusive"); got != "" {
-		t.Errorf("exclusive value = %q, want empty", got)
-	}
-	if got := set.Get("nodes"); got != "2" {
-		t.Errorf("nodes = %q, want 2", got)
-	}
+	require.NoError(t, err)
+	assert.True(t, set.Has("exclusive"))
+	assert.Equal(t, "", set.Get("exclusive"))
+	assert.Equal(t, "2", set.Get("nodes"))
 }
 
 func TestParseQuotedValue(t *testing.T) {
@@ -49,15 +38,9 @@ func TestParseQuotedValue(t *testing.T) {
 #ORVIX queue='a b c'
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := set.Get("application"); got != "hello world" {
-		t.Errorf("application = %q, want %q", got, "hello world")
-	}
-	if got := set.Get("queue"); got != "a b c" {
-		t.Errorf("queue = %q, want %q", got, "a b c")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "hello world", set.Get("application"))
+	assert.Equal(t, "a b c", set.Get("queue"))
 }
 
 func TestParseStopsAtFirstNonCommentLine(t *testing.T) {
@@ -68,25 +51,15 @@ echo before
 #ORVIX time=99
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := set.Get("nodes"); got != "2" {
-		t.Errorf("nodes = %q, want 2", got)
-	}
-	if set.Has("time") {
-		t.Error("time should not be parsed (after non-comment line)")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "2", set.Get("nodes"))
+	assert.False(t, set.Has("time"), "time should not be parsed (after non-comment line)")
 }
 
 func TestParseDefaultSchedulerIsLocal(t *testing.T) {
 	set, err := Parse([]byte("#!/bin/bash\necho hi\n"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := set.Scheduler(); got != "local" {
-		t.Errorf("scheduler = %q, want local", got)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "local", set.Scheduler())
 }
 
 func TestParseSkipsRegularComments(t *testing.T) {
@@ -97,36 +70,24 @@ func TestParseSkipsRegularComments(t *testing.T) {
 #ORVIXNOSPACE=alsoignored
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := set.Get("nodes"); got != "2" {
-		t.Errorf("nodes = %q, want 2", got)
-	}
-	if set.Has("lowercase") {
-		t.Error("lowercase orvix should not be matched")
-	}
-	if set.Has("NOSPACE") {
-		t.Error("#ORVIXNOSPACE should not be matched (no whitespace after marker)")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "2", set.Get("nodes"))
+	assert.False(t, set.Has("lowercase"), "lowercase orvix should not be matched")
+	assert.False(t, set.Has("NOSPACE"), "#ORVIXNOSPACE should not be matched (no whitespace after marker)")
 }
 
 func TestParseRejectsBarePlusValue(t *testing.T) {
 	src := []byte(`#ORVIX nodes 2
 `)
 	_, err := Parse(src)
-	if err == nil {
-		t.Error("expected error for `key value` (no =)")
-	}
+	require.Error(t, err, "expected error for `key value` (no =)")
 }
 
 func TestParseRejectsEmptyKey(t *testing.T) {
 	src := []byte(`#ORVIX =foo
 `)
 	_, err := Parse(src)
-	if err == nil {
-		t.Error("expected error for empty key")
-	}
+	require.Error(t, err, "expected error for empty key")
 }
 
 func TestParseConditionalKeepsMatching(t *testing.T) {
@@ -137,21 +98,11 @@ func TestParseConditionalKeepsMatching(t *testing.T) {
 #ORVIX [scheduler=slurm] queue=normal
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !set.Has("nodes") {
-		t.Error("nodes should be present (unconditional)")
-	}
-	if !set.Has("nodelist") {
-		t.Error("nodelist should be present ([scheduler=donau] matches)")
-	}
-	if set.Has("queue") {
-		t.Error("queue should be excluded ([scheduler=slurm] does not match scheduler=donau)")
-	}
-	if got := set.Get("nodelist"); got != "rp_cme001-418" {
-		t.Errorf("nodelist = %q, want rp_cme001-418", got)
-	}
+	require.NoError(t, err)
+	assert.True(t, set.Has("nodes"), "nodes should be present (unconditional)")
+	assert.True(t, set.Has("nodelist"), "nodelist should be present ([scheduler=donau] matches)")
+	assert.False(t, set.Has("queue"), "queue should be excluded ([scheduler=slurm] does not match scheduler=donau)")
+	assert.Equal(t, "rp_cme001-418", set.Get("nodelist"))
 }
 
 func TestParseConditionalDropsNonMatching(t *testing.T) {
@@ -162,18 +113,10 @@ func TestParseConditionalDropsNonMatching(t *testing.T) {
 #ORVIX [scheduler=slurm] queue=normal
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !set.Has("nodes") {
-		t.Error("nodes should be present (unconditional)")
-	}
-	if set.Has("nodelist") {
-		t.Error("nodelist should be excluded ([scheduler=donau] does not match scheduler=slurm)")
-	}
-	if !set.Has("queue") {
-		t.Error("queue should be present ([scheduler=slurm] matches scheduler=slurm)")
-	}
+	require.NoError(t, err)
+	assert.True(t, set.Has("nodes"), "nodes should be present (unconditional)")
+	assert.False(t, set.Has("nodelist"), "nodelist should be excluded ([scheduler=donau] does not match scheduler=slurm)")
+	assert.True(t, set.Has("queue"), "queue should be present ([scheduler=slurm] matches scheduler=slurm)")
 }
 
 func TestParseConditionalBareKey(t *testing.T) {
@@ -183,15 +126,9 @@ func TestParseConditionalBareKey(t *testing.T) {
 #ORVIX [scheduler=donau] cosched
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !set.Has("exclusive") {
-		t.Error("exclusive should be present ([scheduler=slurm] matches)")
-	}
-	if set.Has("cosched") {
-		t.Error("cosched should be excluded ([scheduler=donau] does not match)")
-	}
+	require.NoError(t, err)
+	assert.True(t, set.Has("exclusive"), "exclusive should be present ([scheduler=slurm] matches)")
+	assert.False(t, set.Has("cosched"), "cosched should be excluded ([scheduler=donau] does not match)")
 }
 
 func TestParseConditionalNoSpace(t *testing.T) {
@@ -200,12 +137,8 @@ func TestParseConditionalNoSpace(t *testing.T) {
 #ORVIX [scheduler=donau]nodelist=rp_cme001-418
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !set.Has("nodelist") {
-		t.Error("nodelist should be present (no space after ] is ok)")
-	}
+	require.NoError(t, err)
+	assert.True(t, set.Has("nodelist"), "nodelist should be present (no space after ] is ok)")
 }
 
 func TestParseConditionalEmptyBrackets(t *testing.T) {
@@ -215,9 +148,7 @@ func TestParseConditionalEmptyBrackets(t *testing.T) {
 #ORVIX [] nodes=4
 `)
 	_, err := Parse(src)
-	if err == nil {
-		t.Error("expected error for [] (no key=value inside brackets)")
-	}
+	require.Error(t, err, "expected error for [] (no key=value inside brackets)")
 }
 
 func TestParseConditionalUnclosedBracket(t *testing.T) {
@@ -227,9 +158,7 @@ func TestParseConditionalUnclosedBracket(t *testing.T) {
 `)
 	// Unclosed [ is treated as part of the key, so parseDirective will error
 	_, err := Parse(src)
-	if err == nil {
-		t.Error("expected error for unclosed [")
-	}
+	require.Error(t, err, "expected error for unclosed [")
 }
 
 func TestParseConditionalMixedWithUnconditional(t *testing.T) {
@@ -239,13 +168,9 @@ func TestParseConditionalMixedWithUnconditional(t *testing.T) {
 #ORVIX [scheduler=donau] time=120
 `)
 	set, err := Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	// The conditional [scheduler=donau] time=120 should override the unconditional time=01:00:00
-	if got := set.Get("time"); got != "120" {
-		t.Errorf("time = %q, want 120 (conditional overrides unconditional)", got)
-	}
+	assert.Equal(t, "120", set.Get("time"), "conditional should override unconditional")
 }
 
 func TestParseWithOverride(t *testing.T) {
@@ -257,18 +182,10 @@ func TestParseWithOverride(t *testing.T) {
 `)
 	// Override to donau: condition filtering uses "donau", and Set.Scheduler() returns "donau"
 	set, err := ParseWithOverride(src, "donau")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := set.Scheduler(); got != "donau" {
-		t.Errorf("scheduler = %q, want donau", got)
-	}
-	if set.Has("queue") {
-		t.Error("queue should be excluded (condition matches slurm, not donau)")
-	}
-	if !set.Has("nodelist") {
-		t.Error("nodelist should be present (condition matches donau)")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "donau", set.Scheduler())
+	assert.False(t, set.Has("queue"), "queue should be excluded (condition matches slurm, not donau)")
+	assert.True(t, set.Has("nodelist"), "nodelist should be present (condition matches donau)")
 }
 
 func TestParseWithOverrideDefaultLocal(t *testing.T) {
@@ -276,12 +193,8 @@ func TestParseWithOverrideDefaultLocal(t *testing.T) {
 #ORVIX nodes=2
 `)
 	set, err := ParseWithOverride(src, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := set.Scheduler(); got != "local" {
-		t.Errorf("scheduler = %q, want local", got)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "local", set.Scheduler())
 }
 
 func TestParseWithOverrideSetsScheduler(t *testing.T) {
@@ -289,15 +202,9 @@ func TestParseWithOverrideSetsScheduler(t *testing.T) {
 #ORVIX nodes=2
 `)
 	set, err := ParseWithOverride(src, "slurm")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := set.Scheduler(); got != "slurm" {
-		t.Errorf("scheduler = %q, want slurm", got)
-	}
-	if !set.Has("scheduler") {
-		t.Error("scheduler should be injected into the Set")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "slurm", set.Scheduler())
+	assert.True(t, set.Has("scheduler"), "scheduler should be injected into the Set")
 }
 
 func TestIsDirectiveLine(t *testing.T) {
@@ -317,8 +224,6 @@ func TestIsDirectiveLine(t *testing.T) {
 		{"", false},
 	}
 	for _, c := range cases {
-		if got := IsDirectiveLine(c.line); got != c.want {
-			t.Errorf("IsDirectiveLine(%q) = %v, want %v", c.line, got, c.want)
-		}
+		assert.Equal(t, c.want, IsDirectiveLine(c.line), "IsDirectiveLine(%q)", c.line)
 	}
 }

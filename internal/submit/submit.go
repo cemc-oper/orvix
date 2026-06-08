@@ -65,7 +65,7 @@ func Run(opts Options) error {
 	}
 	log.Debugf("[submit] using scheduler: %s", sched.Name())
 
-	generated, err := script.Generate(src, directives, sched)
+	generated, err := script.Render(src, directives, sched)
 	if err != nil {
 		return wrap(fmt.Errorf("generate script: %w", err))
 	}

@@ -3,8 +3,10 @@ package submit
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDeriveScriptPath(t *testing.T) {
@@ -42,9 +44,7 @@ func TestDeriveScriptPath(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := deriveScriptPath(tc.orig, tc.outScript)
-			if got != tc.want {
-				t.Errorf("got %q, want %q", got, tc.want)
-			}
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
@@ -59,48 +59,30 @@ func TestGenerateLocal(t *testing.T) {
 echo hello
 `
 	scriptPath := filepath.Join(tmpDir, "test.sh")
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o644); err != nil {
-		t.Fatalf("write script: %v", err)
-	}
+	require.NoError(t, os.WriteFile(scriptPath, []byte(scriptContent), 0o644))
 
 	// Generate should create a .submit file next to the original.
 	gotPath, err := Generate(GenerateOptions{
 		ScriptPath: scriptPath,
 	})
-	if err != nil {
-		t.Fatalf("Generate error: %v", err)
-	}
+	require.NoError(t, err)
 
 	wantPath := scriptPath + ".submit"
-	if gotPath != wantPath {
-		t.Errorf("path: got %q, want %q", gotPath, wantPath)
-	}
+	assert.Equal(t, wantPath, gotPath)
 
 	info, err := os.Stat(wantPath)
-	if err != nil {
-		t.Fatalf("stat generated script: %v", err)
-	}
-	if info.Mode().Perm()&0o111 == 0 {
-		t.Errorf("generated script is not executable: %o", info.Mode().Perm())
-	}
+	require.NoError(t, err)
+	assert.NotZero(t, info.Mode().Perm()&0o111, "generated script should be executable")
 
 	gotBytes, err := os.ReadFile(wantPath)
-	if err != nil {
-		t.Fatalf("read generated script: %v", err)
-	}
+	require.NoError(t, err)
 	got := string(gotBytes)
 
 	// The generated script should preserve the shebang and body,
 	// and strip #ORVIX lines.
-	if !strings.Contains(got, "#!/bin/bash") {
-		t.Error("generated script missing shebang")
-	}
-	if !strings.Contains(got, "echo hello") {
-		t.Error("generated script missing body")
-	}
-	if strings.Contains(got, "#ORVIX") {
-		t.Error("generated script should not contain #ORVIX lines")
-	}
+	assert.Contains(t, got, "#!/bin/bash")
+	assert.Contains(t, got, "echo hello")
+	assert.NotContains(t, got, "#ORVIX")
 }
 
 func TestGenerateCustomOutput(t *testing.T) {
@@ -111,25 +93,18 @@ func TestGenerateCustomOutput(t *testing.T) {
 echo hello
 `
 	scriptPath := filepath.Join(tmpDir, "test.sh")
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o644); err != nil {
-		t.Fatalf("write script: %v", err)
-	}
+	require.NoError(t, os.WriteFile(scriptPath, []byte(scriptContent), 0o644))
 
 	customPath := filepath.Join(tmpDir, "out.sh")
 	gotPath, err := Generate(GenerateOptions{
 		ScriptPath: scriptPath,
 		OutScript:  customPath,
 	})
-	if err != nil {
-		t.Fatalf("Generate error: %v", err)
-	}
-	if gotPath != customPath {
-		t.Errorf("path: got %q, want %q", gotPath, customPath)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, customPath, gotPath)
 
-	if _, err := os.Stat(customPath); err != nil {
-		t.Errorf("generated script not found at custom path: %v", err)
-	}
+	_, err = os.Stat(customPath)
+	require.NoError(t, err, "generated script not found at custom path")
 }
 
 func TestGenerateSchedulerOverride(t *testing.T) {
@@ -141,27 +116,19 @@ func TestGenerateSchedulerOverride(t *testing.T) {
 echo hello
 `
 	scriptPath := filepath.Join(tmpDir, "test.sh")
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o644); err != nil {
-		t.Fatalf("write script: %v", err)
-	}
+	require.NoError(t, os.WriteFile(scriptPath, []byte(scriptContent), 0o644))
 
 	// Default scheduler would be "local". Override to "slurm".
 	_, err := Generate(GenerateOptions{
 		ScriptPath: scriptPath,
 		Scheduler:  "slurm",
 	})
-	if err != nil {
-		t.Fatalf("Generate error: %v", err)
-	}
+	require.NoError(t, err)
 
 	gotBytes, err := os.ReadFile(scriptPath + ".submit")
-	if err != nil {
-		t.Fatalf("read generated script: %v", err)
-	}
+	require.NoError(t, err)
 	got := string(gotBytes)
 
 	// SLURM preamble should contain #SBATCH lines.
-	if !strings.Contains(got, "#SBATCH") {
-		t.Error("expected SLURM #SBATCH lines in generated script")
-	}
+	assert.Contains(t, got, "#SBATCH")
 }
