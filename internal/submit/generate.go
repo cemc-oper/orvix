@@ -34,7 +34,7 @@ func Generate(opts GenerateOptions) (string, error) {
 	logPath := deriveLogPath(origPath)
 	wrap := func(err error) error {
 		if err != nil {
-			_ = writeSubmitLog(logPath, err)
+			_ = writeSubmitLog(logPath, false, "", err.Error())
 		}
 		return err
 	}

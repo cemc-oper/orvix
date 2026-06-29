@@ -28,6 +28,7 @@ type Options struct {
 	Watch         bool
 	WatchInterval time.Duration
 	Out           io.Writer
+	Log           bool // write submit.log (default on; disabled by --no-log)
 }
 
 // Run executes the full submit pipeline.
@@ -40,41 +41,41 @@ func Run(opts Options) error {
 	log.Debugf("[submit] script path: %s", origPath)
 
 	logPath := deriveLogPath(origPath)
-	wrap := func(err error) error {
-		if err != nil {
-			_ = writeSubmitLog(logPath, err)
+	wrap := func(err error, cmd string) error {
+		if err != nil && opts.Log {
+			_ = writeSubmitLog(logPath, false, cmd, err.Error())
 		}
 		return err
 	}
 
 	src, err := os.ReadFile(origPath)
 	if err != nil {
-		return wrap(fmt.Errorf("read script: %w", err))
+		return wrap(fmt.Errorf("read script: %w", err), "")
 	}
 	log.Debugf("[submit] read script: %d bytes", len(src))
 
 	directives, err := directive.ParseWithOverride(src, opts.Scheduler)
 	if err != nil {
-		return wrap(fmt.Errorf("parse directives: %w", err))
+		return wrap(fmt.Errorf("parse directives: %w", err), "")
 	}
 	log.Debugf("[submit] parsed %d directive(s), scheduler=%q", len(directives.Items), directives.Scheduler())
 
 	sched, err := scheduler.For(directives)
 	if err != nil {
-		return wrap(fmt.Errorf("resolve scheduler: %w", err))
+		return wrap(fmt.Errorf("resolve scheduler: %w", err), "")
 	}
 	log.Debugf("[submit] using scheduler: %s", sched.Name())
 
 	generated, err := script.Render(src, directives, sched)
 	if err != nil {
-		return wrap(fmt.Errorf("generate script: %w", err))
+		return wrap(fmt.Errorf("generate script: %w", err), "")
 	}
 	log.Debugf("[submit] generated script: %d bytes", len(generated))
 
 	if opts.DryRun {
 		log.Debug("[submit] dry-run mode: printing generated script")
 		_, err = opts.Out.Write(generated)
-		return wrap(err)
+		return wrap(err, "")
 	}
 
 	now := time.Now()
@@ -83,13 +84,13 @@ func Run(opts Options) error {
 	log.Debugf("[submit] output info:   %s", yamlPath)
 
 	if err := os.WriteFile(genScriptPath, generated, 0o755); err != nil {
-		return wrap(fmt.Errorf("write generated script: %w", err))
+		return wrap(fmt.Errorf("write generated script: %w", err), "")
 	}
 	log.Debug("[submit] wrote generated script")
 
 	jobID, submitCmd, err := sched.Submit(genScriptPath)
 	if err != nil {
-		return wrap(fmt.Errorf("submit: %w", err))
+		return wrap(fmt.Errorf("submit: %w", err), submitCmd)
 	}
 	log.Debugf("[submit] job submitted, id=%s", jobID)
 
@@ -108,11 +109,15 @@ func Run(opts Options) error {
 		Directives:      jobinfo.FromDirectives(directives),
 	}
 	if err := jobinfo.Write(yamlPath, info); err != nil {
-		return wrap(fmt.Errorf("write job info: %w", err))
+		return wrap(fmt.Errorf("write job info: %w", err), "")
 	}
 	log.Debugf("[submit] wrote job info: %s", yamlPath)
 
 	fmt.Fprintln(opts.Out, jobID)
+
+	if opts.Log {
+		_ = writeSubmitLog(logPath, true, submitCmd, jobID)
+	}
 
 	if opts.Watch {
 		log.Debugf("[submit] entering watch mode, interval=%s", opts.WatchInterval)
@@ -156,19 +161,30 @@ func deriveLogPath(origPath string) string {
 	return filepath.Join(dir, base+".submit.log")
 }
 
-// writeSubmitLog writes err to path with a timestamp.
+// writeSubmitLog writes a submit log to path.
+// The format is identical for success and failure, only the status label changes.
+// Content is printed on its own line(s) after the label to mimic real execution output.
 // Failures are silently ignored so logging never masks the original error.
-func writeSubmitLog(path string, err error) error {
-	if err == nil {
-		return nil
-	}
+func writeSubmitLog(path string, success bool, submitCmd, output string) error {
 	f, e := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if e != nil {
 		return e
 	}
 	defer f.Close()
-	_, e = fmt.Fprintf(f, "[%s] ERROR: %v\n", time.Now().Format(time.RFC3339), err)
-	return e
+
+	if submitCmd == "" {
+		submitCmd = "(none)"
+	}
+
+	ts := time.Now().Format(time.RFC3339)
+	if success {
+		_, _ = fmt.Fprintf(f, "[%s] status: SUCCESS\n\n", ts)
+	} else {
+		_, _ = fmt.Fprintf(f, "[%s] ERROR: orvix submit failed\n\n", ts)
+	}
+	_, _ = fmt.Fprintf(f, "[submit-cmd]\n%s\n\n", submitCmd)
+	_, _ = fmt.Fprintf(f, "[output]\n%s\n", output)
+	return nil
 }
 
 func hostnameOrEmpty() string {

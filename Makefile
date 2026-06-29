@@ -10,13 +10,9 @@ endif
 
 OUTPUT := $(BIN_DIR)/$(BINARY)
 
-# Auto-enable vendor mode if vendor/modules.txt exists (offline HPC builds)
 GO_BUILD_FLAGS ?=
-ifneq (,$(wildcard vendor/modules.txt))
-GO_BUILD_FLAGS += -mod=vendor
-endif
 
-.PHONY: all build build-all build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64 build-windows-amd64 test vet tidy vendor vendor-clean clean run help
+.PHONY: all build build-all build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64 build-windows-amd64 test vet tidy clean run help
 
 all: build
 
@@ -50,12 +46,6 @@ vet:
 tidy:
 	$(GO) mod tidy
 
-vendor:
-	$(GO) mod vendor
-
-vendor-clean:
-	rm -rf vendor
-
 clean:
 	rm -rf $(BIN_DIR)
 
@@ -74,13 +64,11 @@ help:
 	@echo "  test                   Run unit tests"
 	@echo "  vet                    Run go vet"
 	@echo "  tidy                   Sync go.mod / go.sum"
-	@echo "  vendor                 Create/update vendor/ directory for offline builds"
-	@echo "  vendor-clean           Remove vendor/ directory"
 	@echo "  clean                  Remove $(BIN_DIR)/"
 	@echo "  run                    Build, then run with ARGS, e.g. make run ARGS=\"submit --dry-run examples/hello.sh\""
 	@echo ""
 	@echo "Variables:"
-	@echo "  GO_BUILD_FLAGS         Extra flags for go build/test/vet (auto-set to -mod=vendor when vendor/ exists)"
+	@echo "  GO_BUILD_FLAGS         Extra flags for go build/test/vet"
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)

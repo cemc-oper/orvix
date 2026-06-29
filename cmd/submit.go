@@ -15,6 +15,7 @@ var (
 	submitOutInfo       string
 	submitWatch         bool
 	submitWatchInterval time.Duration
+	submitNoLog         bool
 )
 
 var submitCmd = &cobra.Command{
@@ -35,6 +36,7 @@ success.`,
 			Watch:         submitWatch,
 			WatchInterval: submitWatchInterval,
 			Out:           cmd.OutOrStdout(),
+			Log:           !submitNoLog,
 		})
 	},
 }
@@ -46,5 +48,6 @@ func init() {
 	submitCmd.Flags().StringVar(&submitOutInfo, "output-info", "", "Path for the job info YAML sidecar (default: <orig>.<ext>.info.yaml next to the input script)")
 	submitCmd.Flags().BoolVar(&submitWatch, "watch", false, "After successful submission, poll job status until it reaches a terminal state")
 	submitCmd.Flags().DurationVar(&submitWatchInterval, "watch-interval", 5*time.Second, "Polling interval when --watch is used")
+	submitCmd.Flags().BoolVar(&submitNoLog, "no-log", false, "Do not write <script>.submit.log (logging is on by default for both success and failure)")
 	rootCmd.AddCommand(submitCmd)
 }

@@ -16,43 +16,39 @@ make build
 
 构建成功后，将生成二进制文件 `bin/orvix`。
 
-### 离线构建（Vendor 模式）
+### 跨平台构建
 
-对于无法连接互联网的 HPC 环境，可以使用 vendor 模式进行离线编译：
+orvix 支持交叉编译，可在有网络的机器上为不同平台生成二进制文件，然后上传到目标 HPC 运行：
 
-**1. 在有网络的机器上准备 vendor 目录：**
-
-```bash
-cd repo/orvix
-make vendor          # 将依赖下载到 vendor/ 目录
-```
-
-**2. 将代码连同 vendor/ 目录复制到目标 HPC：**
-
-```bash
-# 方式一：打包后上传
-tar czf orvix.tar.gz repo/orvix/
-# 在 HPC 上解压后编译
-
-# 方式二：如果代码已存在于 HPC 但无法联网更新依赖
-# 只需将 vendor/ 目录复制到 repo/orvix/ 下即可
-```
-
-**3. 在 HPC 上编译：**
+**1. 为所有支持的平台编译：**
 
 ```bash
 cd repo/orvix
-make build           # 自动检测 vendor/ 存在，使用 -mod=vendor
+make build-all       # 生成 Linux / macOS / Windows 各平台的二进制文件
 ```
 
-Makefile 会自动检测 `vendor/modules.txt` 是否存在，如果存在则自动添加 `-mod=vendor` 标志。
+**2. 仅编译指定平台：**
+
+```bash
+make build-linux-amd64    # Linux AMD64
+make build-linux-arm64    # Linux ARM64
+make build-darwin-amd64   # macOS AMD64
+make build-darwin-arm64   # macOS ARM64 (Apple Silicon)
+make build-windows-amd64  # Windows AMD64
+```
+
+**3. 将生成的二进制文件复制到目标 HPC：**
+
+```bash
+# 例如上传 Linux AMD64 版本
+scp bin/orvix-linux-amd64 user@hpc:/path/to/orvix
+```
 
 **其他常用目标：**
 
 ```bash
-make vendor-clean    # 删除 vendor/ 目录
-make test            # 运行单元测试（也会自动使用 vendor 模式）
-make build-all       # 为所有平台交叉编译
+make test            # 运行单元测试
+make build           # 为当前平台编译
 ```
 
 ## 快速开始
@@ -267,6 +263,7 @@ orvix submit --dry-run script.sh                    # 仅打印翻译后的脚�
 orvix submit --scheduler=slurm script.sh            # 强制指定调度器后端，覆盖脚本中的设置
 orvix submit --watch script.sh                      # 提交后持续轮询状态直到作业结束
 orvix submit --watch --watch-interval=10s script.sh # 自定义轮询间隔（默认：5s）
+orvix submit --no-log script.sh                     # 不生成 .submit.log（默认成功/失败均会生成）
 ```
 
 ### `orvix status <info.yaml>`
@@ -313,11 +310,12 @@ $ orvix kill case/job/serial/orvix_serial.info.yaml
 path/to/script.sh              # 原始脚本（不变）
 path/to/script.sh.submit       # 实际执行的翻译后脚本
 path/to/script.sh.info.yaml    # 作业元数据（status / kill / watch 使用）
-path/to/script.sh.submit.log   # 提交失败时的错误日志（仅失败时生成）
+path/to/script.sh.submit.log   # 提交日志（默认生成，记录提交命令和结果）
 ```
 
-- 提交成功时，会生成 `.submit` 和 `.info.yaml`。
-- 提交失败时（如解析错误、调度器拒绝），会额外生成 `.submit.log`，记录错误和时间戳。
+- 提交成功时，会生成 `.submit`、`.info.yaml` 和 `.submit.log`。
+- 提交失败时（如解析错误、调度器拒绝），会生成 `.submit.log`，记录错误和时间戳。
+- 使用 `--no-log` 可关闭 `.submit.log` 的生成（成功和失败均不生成）。
 - 重新提交会覆盖同名现有文件。
 
 ### `orvix generate` 生成的文件
