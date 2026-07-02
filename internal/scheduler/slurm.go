@@ -78,6 +78,7 @@ func (s *SLURM) PreambleFor(d *directive.Set) ([]string, error) {
 		sbatchQ("nodelist", "nodelist"),
 		sbatch("memory", "mem"),
 		sbatch("dependency", "dependency"),
+		slurmNoRequeue,
 	}
 
 	var lines []string
@@ -95,6 +96,20 @@ func slurmQuote(v string) string {
 		return `"` + v + `"`
 	}
 	return v
+}
+
+// slurmNoRequeue emits "#SBATCH --no-requeue" when the requeue directive is
+// explicitly false. requeue is a neutral boolean key (default true); when true
+// or absent, SLURM's default requeue behavior is kept and nothing is emitted.
+func slurmNoRequeue(d *directive.Set) (string, bool) {
+	v, ok := d.GetOK("requeue")
+	if !ok {
+		return "", false
+	}
+	if strings.EqualFold(strings.TrimSpace(v), "false") {
+		return "#SBATCH --no-requeue", true
+	}
+	return "", false
 }
 
 func (s *SLURM) Submit(scriptPath string) (string, string, error) {

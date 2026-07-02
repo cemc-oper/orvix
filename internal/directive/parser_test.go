@@ -33,6 +33,15 @@ func TestParseBareKey(t *testing.T) {
 	assert.Equal(t, "2", set.Get("nodes"))
 }
 
+func TestParseRequeue(t *testing.T) {
+	// requeue is a known directive added in jobspec v1.
+	set, err := Parse([]byte("#ORVIX requeue=false\n#ORVIX nodes=2\n"))
+	require.NoError(t, err)
+	assert.True(t, set.Has("requeue"))
+	assert.Equal(t, "false", set.Get("requeue"))
+	assert.Equal(t, "2", set.Get("nodes"))
+}
+
 func TestParseQuotedValue(t *testing.T) {
 	src := []byte(`#ORVIX application="hello world"
 #ORVIX queue='a b c'

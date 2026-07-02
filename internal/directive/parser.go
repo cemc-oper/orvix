@@ -45,6 +45,7 @@ var KnownDirectives = map[string]bool{
 	"job-type":        true,
 	"memory":          true,
 	"dependency":      true,
+	"requeue":         true,
 }
 
 // Set is the parsed collection of known directives, indexed by key for quick lookup.
