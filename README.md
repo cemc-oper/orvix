@@ -1,5 +1,7 @@
 # orvix
 
+![Maturity-Sandbox](https://img.shields.io/badge/Maturity-Sandbox-F9D71C)
+
 orvix 是一个用于向 HPC 集群提交脚本作业的命令行工具。
 
 只需在脚本头部使用统一的 `#ORVIX key=value` 语法编写资源需求，orvix 会自动将其转换为目标调度器（如 SLURM）的指令并提交作业。
