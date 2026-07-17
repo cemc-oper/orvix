@@ -3,6 +3,7 @@ package scheduler
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -161,9 +162,19 @@ func (s *SLURM) sacctState(jobID string, reason string) (string, error) {
 	return state, nil
 }
 
-func (s *SLURM) Kill(jobID string) error {
-	log.Debugf("[slurm] scancel %s", jobID)
-	cmd := exec.Command("scancel", jobID)
+func (s *SLURM) Kill(jobID string, sig os.Signal) error {
+	// A nil sig keeps the scancel default (TERM first, KILL after KillWait).
+	var args []string
+	if sig != nil {
+		num, err := signalNumber(sig)
+		if err != nil {
+			return err
+		}
+		args = append(args, "--signal="+num)
+	}
+	args = append(args, jobID)
+	log.Debugf("[slurm] scancel %s", strings.Join(args, " "))
+	cmd := exec.Command("scancel", args...)
 	var errBuf bytes.Buffer
 	cmd.Stderr = &errBuf
 	if err := cmd.Run(); err != nil {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -10,6 +11,8 @@ import (
 	"github.com/cemc-oper/orvix/internal/log"
 	"github.com/cemc-oper/orvix/internal/scheduler"
 )
+
+var killSignal string
 
 var killCmd = &cobra.Command{
 	Use:   "kill <info.yaml>",
@@ -31,11 +34,20 @@ var killCmd = &cobra.Command{
 		}
 		log.Debugf("[kill] info: scheduler=%s job_id=%s", info.Scheduler, info.JobID)
 
+		var sig os.Signal
+		if killSignal != "" {
+			sig, err = scheduler.ParseSignal(killSignal)
+			if err != nil {
+				return err
+			}
+			log.Debugf("[kill] using signal %v", sig)
+		}
+
 		sched, err := scheduler.ByName(info.Scheduler)
 		if err != nil {
 			return err
 		}
-		if err := sched.Kill(info.JobID); err != nil {
+		if err := sched.Kill(info.JobID, sig); err != nil {
 			return err
 		}
 		log.Debugf("[kill] killed job %s", info.JobID)
@@ -44,5 +56,8 @@ var killCmd = &cobra.Command{
 }
 
 func init() {
+	killCmd.Flags().StringVarP(&killSignal, "signal", "s", "",
+		"Signal to send to the job (name like TERM/KILL or number like 15). "+
+			"Default: SIGTERM for local, scheduler default for slurm/donau")
 	rootCmd.AddCommand(killCmd)
 }

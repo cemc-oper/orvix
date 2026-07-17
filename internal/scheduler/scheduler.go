@@ -3,6 +3,7 @@ package scheduler
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/cemc-oper/orvix/internal/directive"
 )
@@ -24,8 +25,9 @@ type Scheduler interface {
 	Submit(scriptPath string) (jobID string, command string, err error)
 	// Status reports the state of a previously submitted job.
 	Status(jobID string) (string, error)
-	// Kill terminates a running job.
-	Kill(jobID string) error
+	// Kill terminates a running job. A nil sig selects the backend's default
+	// signal (SIGTERM where the backend controls the signal itself).
+	Kill(jobID string, sig os.Signal) error
 	// NormalizeState converts a scheduler-specific raw state string to a
 	// scheduler-agnostic JobState.
 	NormalizeState(raw string) JobState

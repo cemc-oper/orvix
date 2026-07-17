@@ -54,17 +54,22 @@ func (l *Local) Status(jobID string) (string, error) {
 	return "RUNNING", nil
 }
 
-func (l *Local) Kill(jobID string) error {
+// Kill sends a signal to the job's process. A nil sig defaults to SIGTERM
+// (matching `kill -15`) so scripts can run their trap/cleanup handlers.
+func (l *Local) Kill(jobID string, sig os.Signal) error {
 	pid, err := strconv.Atoi(jobID)
 	if err != nil {
 		return fmt.Errorf("invalid pid %q", jobID)
 	}
-	log.Debugf("[local] killing pid %d", pid)
+	if sig == nil {
+		sig = syscall.SIGTERM
+	}
+	log.Debugf("[local] sending signal %v to pid %d", sig, pid)
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return err
 	}
-	return proc.Kill()
+	return proc.Signal(sig)
 }
 
 func (l *Local) NormalizeState(raw string) JobState {

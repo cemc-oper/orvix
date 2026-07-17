@@ -3,6 +3,7 @@ package scheduler
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -260,7 +261,10 @@ func (d *Donau) Status(jobID string) (string, error) {
 	return "", fmt.Errorf("djob: no STATE field found for job %s", jobID)
 }
 
-func (d *Donau) Kill(jobID string) error {
+func (d *Donau) Kill(jobID string, sig os.Signal) error {
+	if sig != nil {
+		return fmt.Errorf("donau kill does not support custom signals")
+	}
 	log.Debugf("[donau] djob -T %s", jobID)
 	cmd := exec.Command("djob", "-T", jobID)
 	var errBuf bytes.Buffer
