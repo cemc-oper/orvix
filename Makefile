@@ -1,6 +1,9 @@
-GO       ?= go
-BIN_DIR  ?= bin
-PKG      ?= ./...
+GO           ?= go
+BIN_DIR      ?= bin
+PKG          ?= ./...
+# CGO disabled by default: produce a fully static binary with no libc
+# dependency, so it runs on systems with older glibc (e.g. the HPC).
+CGO_ENABLED  ?= 0
 
 ifeq ($(OS),Windows_NT)
 BINARY := orvix.exe
@@ -17,7 +20,7 @@ GO_BUILD_FLAGS ?=
 all: build
 
 build: | $(BIN_DIR)
-	$(GO) build $(GO_BUILD_FLAGS) -o $(OUTPUT) .
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(GO_BUILD_FLAGS) -o $(OUTPUT) .
 
 # Cross-compilation targets (CGO disabled for fully static binaries)
 build-linux-amd64: | $(BIN_DIR)
@@ -69,6 +72,7 @@ help:
 	@echo ""
 	@echo "Variables:"
 	@echo "  GO_BUILD_FLAGS         Extra flags for go build/test/vet"
+	@echo "  CGO_ENABLED            0 (default) = fully static binary; 1 = link against system libc"
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
