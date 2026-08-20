@@ -1,6 +1,7 @@
 # orvix
 
 ![Maturity-Sandbox](https://img.shields.io/badge/Maturity-Sandbox-F9D71C)
+[![ci](https://github.com/cemc-oper/orvix/actions/workflows/ci.yml/badge.svg)](https://github.com/cemc-oper/orvix/actions/workflows/ci.yml)
 
 orvix 是一个用于向 HPC 集群提交脚本作业的命令行工具。
 
