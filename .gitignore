@@ -33,3 +33,6 @@ bin/
 
 vendor/
 vendor.tar.gz
+
+# GoReleaser output
+dist/

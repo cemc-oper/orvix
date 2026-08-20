@@ -8,6 +8,22 @@ orvix 是一个用于向 HPC 集群提交脚本作业的命令行工具。
 
 ## 安装
 
+### 下载预编译二进制（推荐）
+
+从 [GitHub Releases](https://github.com/cemc-oper/orvix/releases) 下载对应平台的压缩包，解压后将 `orvix` 放入 `PATH` 即可。所有发布产物均为 CGO 关闭的全静态二进制，可在老版本 glibc 的 HPC 上直接运行。
+
+```bash
+# 例如 Linux AMD64
+tar -xzf orvix_<version>_linux_amd64.tar.gz
+install -m 755 orvix /path/to/bin/
+```
+
+### 使用 go install
+
+```bash
+go install github.com/cemc-oper/orvix@v<version>
+```
+
 ### 常规构建
 
 在 Linux 上，可直接使用 Makefile 构建：

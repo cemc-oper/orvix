@@ -76,3 +76,9 @@ help:
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
+
+# GoReleaser dry-run: build release artifacts locally without publishing
+# (requires goreleaser on PATH; output goes to dist/)
+.PHONY: release-snapshot
+release-snapshot:
+	goreleaser release --snapshot --clean
