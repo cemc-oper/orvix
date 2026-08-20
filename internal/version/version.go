@@ -1,17 +1,29 @@
 // Package version records the orvix CLI version.
 //
-// The version is derived at runtime from the Go build info injected by the
-// toolchain (Go 1.18+). When the binary is built from a Go module with a
-// version tag, that tag is used (e.g. "v1.2.3"). For local development
-// builds, the git commit hash is used instead. Falls back to "dev" when no
-// version info is available.
+// Release builds (GoReleaser) inject the tag at link time via:
+//
+//	-X github.com/cemc-oper/orvix/internal/version.Version=vX.Y.Z
+//
+// Otherwise the version is derived at runtime from the Go build info
+// injected by the toolchain (Go 1.18+). When the binary is installed as a
+// versioned module (go install ...@vX.Y.Z), that tag is used. For local
+// development builds, the git commit hash is used instead. Falls back to
+// "dev" when no version info is available.
 package version
 
 import "runtime/debug"
 
 // Version is the orvix release version.
-// It is computed from the Go build info on first call and cached.
-var Version = computeVersion()
+//
+// Release builds set it at link time (see the package doc), in which case it
+// is used as-is. Otherwise it is filled in by computeVersion at startup.
+var Version = ""
+
+func init() {
+	if Version == "" {
+		Version = computeVersion()
+	}
+}
 
 func computeVersion() string {
 	info, ok := debug.ReadBuildInfo()
