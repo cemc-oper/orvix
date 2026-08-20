@@ -11,7 +11,8 @@ orvix 是一个用于向 HPC 集群提交脚本作业的命令行工具。
 
 ### 下载预编译二进制（推荐）
 
-从 [GitHub Releases](https://github.com/cemc-oper/orvix/releases) 下载对应平台的压缩包，解压后将 `orvix` 放入 `PATH` 即可。所有发布产物均为 CGO 关闭的全静态二进制，可在老版本 glibc 的 HPC 上直接运行。
+从 [GitHub Releases](https://github.com/cemc-oper/orvix/releases) 下载对应平台的压缩包，解压后将 `orvix` 放入 `PATH` 即可。
+所有发布产物均为 CGO 关闭的全静态二进制，可在老版本 glibc 的 HPC 上直接运行。
 
 ```bash
 # 例如 Linux AMD64
@@ -35,39 +36,27 @@ make build
 
 构建成功后，将生成二进制文件 `bin/orvix`。
 
-### 跨平台构建
+### 交叉编译 Linux 版本
 
-orvix 支持交叉编译，可在有网络的机器上为不同平台生成二进制文件，然后上传到目标 HPC 运行：
-
-**1. 为所有支持的平台编译：**
+在没有网络的机器上无法直接下载发布产物时，可在有网络的机器上交叉编译 Linux 版本，再上传到目标 HPC 运行（CGO 关闭，全静态二进制，兼容老版本 glibc）：
 
 ```bash
-cd repo/orvix
-make build-all       # 生成 Linux / macOS / Windows 各平台的二进制文件
+make build-linux-amd64    # Linux AMD64，生成 bin/orvix-linux-amd64
+make build-linux-arm64    # Linux ARM64，生成 bin/orvix-linux-arm64
+make build-all            # 当前平台 + 上述两个 Linux 目标
 ```
-
-**2. 仅编译指定平台：**
-
-```bash
-make build-linux-amd64    # Linux AMD64
-make build-linux-arm64    # Linux ARM64
-make build-darwin-amd64   # macOS AMD64
-make build-darwin-arm64   # macOS ARM64 (Apple Silicon)
-make build-windows-amd64  # Windows AMD64
-```
-
-**3. 将生成的二进制文件复制到目标 HPC：**
 
 ```bash
 # 例如上传 Linux AMD64 版本
 scp bin/orvix-linux-amd64 user@hpc:/path/to/orvix
 ```
 
-**其他常用目标：**
+其他常用目标：
 
 ```bash
-make test            # 运行单元测试
-make build           # 为当前平台编译
+make test               # 运行单元测试
+make build              # 为当前平台编译
+make release-snapshot   # GoReleaser 本地演练（产物到 dist/，不发布）
 ```
 
 ## 快速开始
