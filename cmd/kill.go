@@ -58,6 +58,8 @@ var killCmd = &cobra.Command{
 func init() {
 	killCmd.Flags().StringVarP(&killSignal, "signal", "s", "",
 		"Signal to send to the job (name like TERM/KILL or number like 15). "+
-			"Default: SIGTERM for local, scheduler default for slurm/donau")
+			"Default: SIGTERM for local; staged graceful kill for slurm "+
+			"(scancel --full --signal=TERM, plain scancel after "+
+			"ORVIX_SLURM_KILL_GRACE seconds, default 30); scheduler default for donau")
 	rootCmd.AddCommand(killCmd)
 }

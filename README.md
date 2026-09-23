@@ -302,11 +302,25 @@ orvix watch -i 10s case/job/serial/orvix_serial.info.yaml  # 每 10 秒轮询一
 
 ### `orvix kill <info.yaml>`
 
-终止作业。
+终止作业。对已结束的作业重复执行 kill 视为成功（幂等）。
 
 ```bash
 $ orvix kill case/job/serial/orvix_serial.info.yaml
 ```
+
+Slurm 后端的默认行为是分阶段优雅终止，让作业脚本的信号 trap（如 ecFlow head.h 的
+`ecflow_client --abort` 上报）有机会执行：
+
+1. `scancel --full --signal=TERM <jobid>` —— TERM 同时送达 batch 脚本及其全部子进程
+   （裸 `scancel` 只发给 batch shell 本身，脚本若在前台等待子进程，trap 会被推迟到
+   子进程自行结束后才执行，通常来不及）；
+2. 轮询作业状态，最多等待宽限期（默认 30 秒，可用 `ORVIX_SLURM_KILL_GRACE`
+   环境变量覆盖，单位秒，`0` 表示立即升级）；
+3. 超时仍未结束则兜底 `scancel <jobid>`（controller cancel 路径：SIGCONT+SIGTERM、
+   KillWait 后 SIGKILL，并把作业标记为 CANCELLED）。
+
+`orvix kill -s <信号>` 显式指定信号时保持单次发送语义，但同样附加 `--full`，
+确保信号能到达 batch 脚本的子进程。
 
 ## 生成的文件
 

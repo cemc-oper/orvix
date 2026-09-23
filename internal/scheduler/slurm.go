@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cemc-oper/orvix/internal/directive"
 	"github.com/cemc-oper/orvix/internal/log"
@@ -162,16 +164,68 @@ func (s *SLURM) sacctState(jobID string, reason string) (string, error) {
 	return state, nil
 }
 
+// Kill terminates a SLURM job.
+//
+// Default behaviour (sig == nil) is a staged graceful kill:
+//  1. scancel --full --signal=TERM <jobid>
+//     --full delivers TERM to the batch script *and* its children, so a
+//     batch script waiting on a foreground child gets to run its signal
+//     trap (a plain scancel only signals the batch shell, whose trap is
+//     then deferred until the child exits on its own; see man scancel).
+//  2. Poll the job state for up to the grace period (default 30s,
+//     overridable with ORVIX_SLURM_KILL_GRACE in seconds), giving trap
+//     handlers time to run.
+//  3. If the job is still not in a terminal state, fall back to a plain
+//     scancel <jobid> (controller cancel path: SIGCONT+SIGTERM, KillWait,
+//     then SIGKILL; it also marks the job CANCELLED, which the --signal
+//     path never does because it bypasses slurmctld).
+//
+// An explicit signal keeps single-shot semantics but adds --full so the
+// signal reaches the batch script's children as well.
+//
+// Killing a job that has already finished is treated as success.
 func (s *SLURM) Kill(jobID string, sig os.Signal) error {
-	// A nil sig keeps the scancel default (TERM first, KILL after KillWait).
-	var args []string
 	if sig != nil {
 		num, err := signalNumber(sig)
 		if err != nil {
 			return err
 		}
-		args = append(args, "--signal="+num)
+		if err := s.scancel(jobID, "--full", "--signal="+num); err != nil {
+			return s.ignoreGone(jobID, err)
+		}
+		return nil
 	}
+
+	if err := s.scancel(jobID, "--full", "--signal=TERM"); err != nil {
+		return s.ignoreGone(jobID, err)
+	}
+
+	deadline := time.Now().Add(slurmKillGrace())
+	for {
+		raw, err := s.Status(jobID)
+		if err != nil {
+			log.Debugf("[slurm] job %s no longer visible, treating kill as done: %v", jobID, err)
+			return nil
+		}
+		if state := s.NormalizeState(raw); state.IsTerminal() {
+			log.Debugf("[slurm] job %s reached terminal state %s", jobID, state)
+			return nil
+		}
+		if !time.Now().Before(deadline) {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	log.Debugf("[slurm] job %s still alive after grace, escalating to plain scancel", jobID)
+	if err := s.scancel(jobID); err != nil {
+		return s.ignoreGone(jobID, err)
+	}
+	return nil
+}
+
+// scancel runs scancel with args followed by the job id.
+func (s *SLURM) scancel(jobID string, args ...string) error {
 	args = append(args, jobID)
 	log.Debugf("[slurm] scancel %s", strings.Join(args, " "))
 	cmd := exec.Command("scancel", args...)
@@ -180,8 +234,48 @@ func (s *SLURM) Kill(jobID string, sig os.Signal) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("scancel: %s: %w", strings.TrimSpace(errBuf.String()), err)
 	}
-	log.Debugf("[slurm] scancel succeeded for job %s", jobID)
 	return nil
+}
+
+// ignoreGone converts a failed scancel into success when the job is already
+// gone (scancel's own error message, or a state cross-check).
+func (s *SLURM) ignoreGone(jobID string, err error) error {
+	if killGone(err) || s.jobGone(jobID) {
+		log.Debugf("[slurm] job %s already gone, treating kill as success (%v)", jobID, err)
+		return nil
+	}
+	return err
+}
+
+// killGone reports whether a failed scancel invocation refers to a job that
+// is already finished or unknown to the controller.
+func killGone(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "invalid job id") ||
+		strings.Contains(msg, "already completing or completed")
+}
+
+// jobGone reports whether the job has reached a terminal state or is no
+// longer visible to squeue/sacct at all.
+func (s *SLURM) jobGone(jobID string) bool {
+	raw, err := s.Status(jobID)
+	if err != nil {
+		return true
+	}
+	return s.NormalizeState(raw).IsTerminal()
+}
+
+// slurmKillGrace is the grace period between the TERM stage and the cancel
+// fallback of a default Kill. Overridable with ORVIX_SLURM_KILL_GRACE
+// (seconds); 0 disables the wait and escalates immediately.
+func slurmKillGrace() time.Duration {
+	if v := strings.TrimSpace(os.Getenv("ORVIX_SLURM_KILL_GRACE")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return time.Duration(n) * time.Second
+		}
+		log.Debugf("[slurm] ignoring invalid ORVIX_SLURM_KILL_GRACE=%q", v)
+	}
+	return 30 * time.Second
 }
 
 func (s *SLURM) NormalizeState(raw string) JobState {
