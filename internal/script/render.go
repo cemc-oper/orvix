@@ -13,7 +13,8 @@ import (
 )
 
 // Render produces a runnable script for the given scheduler:
-//   - Preserves the shebang on the first line
+//   - Preserves the shebang on the first non-empty line (leading blank lines
+//     are tolerated: ecFlow-created job files may start with one)
 //   - Inserts the scheduler-specific preamble (e.g. #SBATCH lines)
 //   - Strips the original `#ORVIX ...` lines
 //   - Keeps the rest of the script intact
@@ -27,7 +28,8 @@ func Render(src []byte, d *directive.Set, sched scheduler.Scheduler) ([]byte, er
 	var (
 		shebang string
 		bodyBuf bytes.Buffer
-		first   = true
+		// shebang may still be the next line while only blanks seen so far
+		leading = true
 	)
 
 	scanner := bufio.NewScanner(bytes.NewReader(src))
@@ -35,12 +37,15 @@ func Render(src []byte, d *directive.Set, sched scheduler.Scheduler) ([]byte, er
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if first {
-			first = false
+		if leading {
 			if strings.HasPrefix(line, "#!") {
 				shebang = line
+				leading = false
 				log.Debugf("[script] shebang: %s", shebang)
 				continue
+			}
+			if strings.TrimSpace(line) != "" {
+				leading = false
 			}
 		}
 		if directive.IsDirectiveLine(line) {
