@@ -13,7 +13,24 @@ import (
 )
 
 // Local runs scripts directly on the current host without a scheduler.
-type Local struct{}
+//
+// Unlike the slurm/donau backends there is no scheduler layer to honour the
+// output/error directives, so Submit redirects the child's stdout/stderr to
+// those paths itself (matching slurm semantics: no error directive means
+// stderr merges into the output file). Without this the child inherits
+// whatever stdout the submit caller had — under ecFlow's ECF_JOB_CMD that
+// output is lost entirely, leaving failed local jobs with no log at all.
+// A zero-value Local (e.g. from ByName on status/kill paths) keeps the
+// legacy inherit-parent behaviour.
+type Local struct {
+	outputPath string
+	errorPath  string
+}
+
+// NewLocal builds a Local backend honouring the output/error directives.
+func NewLocal(d *directive.Set) *Local {
+	return &Local{outputPath: d.Get("output"), errorPath: d.Get("error")}
+}
 
 func (l *Local) Name() string { return "local" }
 
@@ -24,16 +41,66 @@ func (l *Local) PreambleFor(_ *directive.Set) ([]string, error) {
 func (l *Local) Submit(scriptPath string) (string, string, error) {
 	log.Debugf("[local] starting script: %s", scriptPath)
 	cmd := exec.Command(scriptPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
+	closers, err := l.redirect(cmd)
+	if err != nil {
 		return "", cmd.String(), err
+	}
+	if err := cmd.Start(); err != nil {
+		for _, c := range closers {
+			_ = c.Close()
+		}
+		return "", cmd.String(), err
+	}
+	// The child holds its own copy of the redirected fds; close ours.
+	for _, c := range closers {
+		_ = c.Close()
 	}
 	pid := cmd.Process.Pid
 	log.Debugf("[local] started process, pid=%d", pid)
 	// Reap the child in the background so we don't leave a zombie.
 	go cmd.Wait()
 	return strconv.Itoa(pid), cmd.String(), nil
+}
+
+// redirect wires the child's stdout/stderr to the output/error directive
+// paths, falling back to the parent's streams when unset. Returned closers
+// must be closed once the child has started (or failed to start).
+func (l *Local) redirect(cmd *exec.Cmd) ([]*os.File, error) {
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if l.outputPath == "" && l.errorPath == "" {
+		return nil, nil
+	}
+	var files []*os.File
+	fail := func(err error) ([]*os.File, error) {
+		for _, f := range files {
+			_ = f.Close()
+		}
+		return nil, err
+	}
+	out := os.Stdout
+	if l.outputPath != "" {
+		f, err := os.Create(l.outputPath)
+		if err != nil {
+			return fail(fmt.Errorf("open output %s: %w", l.outputPath, err))
+		}
+		files = append(files, f)
+		out = f
+	}
+	cmd.Stdout = out
+	switch {
+	case l.errorPath == "" || l.errorPath == l.outputPath:
+		// slurm semantics: stderr merges into the output file
+		cmd.Stderr = out
+	default:
+		f, err := os.Create(l.errorPath)
+		if err != nil {
+			return fail(fmt.Errorf("open error %s: %w", l.errorPath, err))
+		}
+		files = append(files, f)
+		cmd.Stderr = f
+	}
+	return files, nil
 }
 
 func (l *Local) Status(jobID string) (string, error) {

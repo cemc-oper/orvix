@@ -35,6 +35,11 @@ type Scheduler interface {
 
 // For picks the scheduler implementation based on parsed directives.
 func For(d *directive.Set) (Scheduler, error) {
+	// local has no scheduler layer to honour output/error directives, so the
+	// backend itself redirects the child's streams to those paths at Submit.
+	if d.Scheduler() == "" || d.Scheduler() == "local" {
+		return NewLocal(d), nil
+	}
 	return ByName(d.Scheduler())
 }
 
