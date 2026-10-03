@@ -57,6 +57,59 @@ func TestLocalKillInvalidPid(t *testing.T) {
 	assert.Error(t, (&Local{}).Kill("not-a-pid", nil))
 }
 
+// awaitGroupGone asserts that no process remains in process group pgid.
+func awaitGroupGone(t *testing.T, pgid int) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := syscall.Kill(-pgid, 0); err != nil {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("process group %d still has members after kill", pgid)
+}
+
+func TestLocalSubmitCreatesOwnProcessGroup(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/job.sh"
+	require.NoError(t, os.WriteFile(path, []byte("#!/usr/bin/env bash\nsleep 60\n"), 0o755))
+
+	pidStr, _, err := (&Local{}).Submit(path)
+	require.NoError(t, err)
+	pid, err := strconv.Atoi(pidStr)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = (&Local{}).Kill(pidStr, syscall.SIGKILL) })
+
+	pgid, err := syscall.Getpgid(pid)
+	require.NoError(t, err)
+	assert.Equal(t, pid, pgid, "submitted job must be its own process-group leader")
+}
+
+func TestLocalKillTerminatesWholeTree(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/job.sh"
+	// bash waits on a foreground child, deferring any trap until the child
+	// exits — a single-pid signal would leave the tree running.
+	content := "#!/usr/bin/env bash\nsleep 300 &\nwait\n"
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o755))
+
+	pidStr, _, err := (&Local{}).Submit(path)
+	require.NoError(t, err)
+	pid, err := strconv.Atoi(pidStr)
+	require.NoError(t, err)
+
+	require.NoError(t, (&Local{}).Kill(pidStr, nil))
+	awaitGroupGone(t, pid)
+}
+
+func TestLocalKillFinishedJobSucceeds(t *testing.T) {
+	cmd := exec.Command("true")
+	require.NoError(t, cmd.Run())
+	// The pid is gone (and not a group leader); repeated kills must succeed.
+	require.NoError(t, (&Local{}).Kill(strconv.Itoa(cmd.Process.Pid), nil))
+}
+
 // writeJobScript writes an executable script emitting one line each to
 // stdout and stderr, then exits.
 func writeJobScript(t *testing.T, dir string) string {

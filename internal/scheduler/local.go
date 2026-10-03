@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -41,6 +42,7 @@ func (l *Local) PreambleFor(_ *directive.Set) ([]string, error) {
 func (l *Local) Submit(scriptPath string) (string, string, error) {
 	log.Debugf("[local] starting script: %s", scriptPath)
 	cmd := exec.Command(scriptPath)
+	setProcGroup(cmd)
 	closers, err := l.redirect(cmd)
 	if err != nil {
 		return "", cmd.String(), err
@@ -121,8 +123,18 @@ func (l *Local) Status(jobID string) (string, error) {
 	return "RUNNING", nil
 }
 
-// Kill sends a signal to the job's process. A nil sig defaults to SIGTERM
-// (matching `kill -15`) so scripts can run their trap/cleanup handlers.
+// Kill sends a signal to the job's whole process tree. A nil sig defaults
+// to SIGTERM (matching `kill -15`) so scripts can run their trap/cleanup
+// handlers.
+//
+// Submit places the job in its own process group with pgid == pid, so the
+// signal first goes to the entire group: a wrapper bash waiting on a
+// foreground child would otherwise defer its trap until the child exits
+// and never forward the signal, leaving the tree running. Jobs submitted
+// before process groups were introduced have no such group; there the
+// signal falls back to the single recorded pid (legacy behaviour). A job
+// that has already finished is reported as success so repeated kills are
+// idempotent.
 func (l *Local) Kill(jobID string, sig os.Signal) error {
 	pid, err := strconv.Atoi(jobID)
 	if err != nil {
@@ -131,12 +143,27 @@ func (l *Local) Kill(jobID string, sig os.Signal) error {
 	if sig == nil {
 		sig = syscall.SIGTERM
 	}
-	log.Debugf("[local] sending signal %v to pid %d", sig, pid)
+	log.Debugf("[local] sending signal %v to process group %d", sig, pid)
+	err = signalGroup(pid, sig)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, syscall.ESRCH) {
+		return err
+	}
+	log.Debugf("[local] no process group %d, falling back to single pid", pid)
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return err
 	}
-	return proc.Signal(sig)
+	if err := proc.Signal(sig); err != nil {
+		if errors.Is(err, syscall.ESRCH) || errors.Is(err, os.ErrProcessDone) {
+			log.Debugf("[local] pid %d already finished, treating kill as success", pid)
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func (l *Local) NormalizeState(raw string) JobState {
