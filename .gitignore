@@ -36,3 +36,6 @@ vendor.tar.gz
 
 # GoReleaser output
 dist/
+
+# Sphinx docs build output
+docs/build/

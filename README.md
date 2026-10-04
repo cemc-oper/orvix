@@ -5,14 +5,18 @@
 
 orvix 是一个用于向 HPC 集群提交脚本作业的命令行工具。
 
-只需在脚本头部使用统一的 `#ORVIX key=value` 语法编写资源需求，orvix 会自动将其转换为目标调度器（如 SLURM）的指令并提交作业。
+只需在脚本头部使用统一的 `#ORVIX key=value` 语法编写资源需求，orvix 会自动将其转换为目标调度器
+（SLURM / 华为 Donau / 本地运行）的指令并提交作业。
+
+完整文档见 **[orvix.readthedocs.io](https://orvix.readthedocs.io/)**。
 
 ## 安装
 
 ### 下载预编译二进制（推荐）
 
-从 [GitHub Releases](https://github.com/cemc-oper/orvix/releases) 下载对应平台的压缩包，解压后将 `orvix` 放入 `PATH` 即可。
-所有发布产物均为 CGO 关闭的全静态二进制，可在老版本 glibc 的 HPC 上直接运行。
+从 [GitHub Releases](https://github.com/cemc-oper/orvix/releases) 下载对应平台的压缩包，
+解压后将 `orvix` 放入 `PATH` 即可。所有发布产物均为 CGO 关闭的全静态二进制，
+可在老版本 glibc 的 HPC 上直接运行。
 
 ```bash
 # 例如 Linux AMD64
@@ -26,37 +30,18 @@ install -m 755 orvix /path/to/bin/
 go install github.com/cemc-oper/orvix@v<version>
 ```
 
-### 常规构建
-
-在 Linux 上，可直接使用 Makefile 构建：
+### 从源码构建
 
 ```bash
-make build
+make build              # 生成 bin/orvix
 ```
 
-构建成功后，将生成二进制文件 `bin/orvix`。
-
-### 交叉编译 Linux 版本
-
-在没有网络的机器上无法直接下载发布产物时，可在有网络的机器上交叉编译 Linux 版本，再上传到目标 HPC 运行（CGO 关闭，全静态二进制，兼容老版本 glibc）：
+在没有网络的 HPC 上，可在有网络的机器上交叉编译后上传（CGO 关闭，全静态二进制）：
 
 ```bash
-make build-linux-amd64    # Linux AMD64，生成 bin/orvix-linux-amd64
-make build-linux-arm64    # Linux ARM64，生成 bin/orvix-linux-arm64
-make build-all            # 当前平台 + 上述两个 Linux 目标
-```
-
-```bash
-# 例如上传 Linux AMD64 版本
+make build-linux-amd64  # Linux AMD64
+make build-linux-arm64  # Linux ARM64
 scp bin/orvix-linux-amd64 user@hpc:/path/to/orvix
-```
-
-其他常用目标：
-
-```bash
-make test               # 运行单元测试
-make build              # 为当前平台编译
-make release-snapshot   # GoReleaser 本地演练（产物到 dist/，不发布）
 ```
 
 ## 快速开始
@@ -70,53 +55,11 @@ make release-snapshot   # GoReleaser 本地演练（产物到 dist/，不发布�
 #ORVIX job-name=demo
 #ORVIX nodes=2
 #ORVIX time=01:00:00
-#ORVIX exclusive
 
 echo "Hello from HPC"
 ```
 
-使用 `orvix generate` 仅生成提交脚本（不提交）：
-
-```bash
-$ orvix generate myjob.sh
-Generated: /abs/path/myjob.sh.submit
-```
-
-使用 `orvix submit` 提交脚本：
-
-```bash
-$ orvix submit myjob.sh
-12345678
-```
-
-该命令会生成两个附属文件：
-
-- `myjob.sh.submit`：翻译后的脚本，用于提交到作业队列
-- `myjob.sh.info.yaml`：作业元数据，包含作业 ID
-
-使用 `orvix status` 查看作业状态：
-
-```bash
-$ orvix status myjob.sh.info.yaml
-RUNNING
-```
-
-使用 `orvix watch` 持续监视作业直到结束：
-
-```bash
-$ orvix watch myjob.sh.info.yaml
-[2026-05-22T03:48:10Z] PENDING
-[2026-05-22T03:48:15Z] RUNNING
-[2026-05-22T03:50:20Z] COMPLETED
-```
-
-使用 `orvix kill` 终止作业：
-
-```bash
-$ orvix kill myjob.sh.info.yaml
-```
-
-一步完成提交和监视：
+提交并监视作业：
 
 ```bash
 $ orvix submit --watch myjob.sh
@@ -126,305 +69,31 @@ $ orvix submit --watch myjob.sh
 [2026-05-22T03:50:20Z] COMPLETED
 ```
 
-## 工作流程
-
-```mermaid
-flowchart TD
-    A[用户脚本<br/>#ORVIX 指令] --> B{orvix submit<br/>or generate?}
-    B -->|generate| C[解析 #ORVIX 指令]
-    C --> D[选择调度器后端]
-    D --> E[生成翻译后的脚本]
-    E --> G[写入 .submit 文件]
-    G --> N[完成]
-    B -->|submit| C
-    E --> F{dry-run?}
-    F -->|是| P[打印脚本]
-    P --> N
-    F -->|否| H[提交到调度器]
-    H --> I[输出作业 ID]
-    I --> J[生成 .info.yaml]
-    J --> K{--watch?}
-    K -->|是| L[轮询状态直到结束]
-    K -->|否| N
-    L --> N
-```
-
-## 指令语法
-
-`#ORVIX` 指令必须出现在脚本的初始注释块中（在第一个非空、非注释行之前）：
+其他常用命令：
 
 ```bash
-#!/bin/bash
-#ORVIX scheduler=slurm
-#ORVIX queue=normal
-#ORVIX job-name=demo
-#ORVIX nodes=2
-#ORVIX time=01:00:00
-#ORVIX comment="long running benchmark"
-#ORVIX exclusive
-
-set -euo pipefail
-echo "running"
+orvix generate myjob.sh          # 只生成翻译后的 .submit 脚本，不提交
+orvix status myjob.sh.info.yaml  # 查询作业状态
+orvix kill myjob.sh.info.yaml    # 终止作业
 ```
 
-### 语法规则
+## 文档
 
-| 语法 | 含义 |
-|---|---|
-| `#ORVIX key=value` | 带值的指令 |
-| `#ORVIX key` | 无值指令（如布尔标志 `exclusive`） |
-| `#ORVIX key="x y"` 或 `'x y'` | 包含空格的值必须用双引号或单引号包裹 |
+在线文档：<https://orvix.readthedocs.io/>
 
-注意事项：
-
-- `#ORVIX` 必须为大写，`#` 后不能有空格。`# ORVIX`、`#orvix` 和 `#ORVIXFOO` 均会被忽略。
-- 解析在第一个非空、非注释行处停止。
-- 指令必须为 `key=value` 形式；`key value`（无 `=`）是错误。
-
-### 常用指令
-
-#### 调度器与标识
-
-| 指令 | 说明 | 示例 |
-|---|---|---|
-| `scheduler` | 选择调度器后端（`slurm`、`donau` 或 `local`），默认 `local` | `scheduler=slurm` |
-| `job-name` | 作业名称 | `job-name=myjob` |
-| `queue` | 分区 / 队列 | `queue=normal` |
-
-#### 计算资源
-
-| 指令 | 说明 | 示例 |
-|---|---|---|
-| `nodes` | 节点数量 | `nodes=2` |
-| `ntasks` | 任务总数 | `ntasks=4` |
-| `ntasks-per-node` | 每节点任务数 | `ntasks-per-node=2` |
-| `cpus-per-task` | 每任务 CPU 数 | `cpus-per-task=4` |
-| `time` | 时间限制（`HH:MM:SS`） | `time=01:00:00` |
-| `memory` | 内存需求 | `memory=16G` |
-| `exclusive` | 独占节点访问 | `exclusive` |
-| `nodelist` | 指定节点列表 | `nodelist=node[01-04]` |
-
-#### I/O
-
-| 指令 | 说明 | 示例 |
-|---|---|---|
-| `output` | 标准输出文件 | `output=job.out` |
-| `error` | 标准错误文件 | `error=job.err` |
-
-#### 作业控制
-
-| 指令 | 说明 | 示例 |
-|---|---|---|
-| `account` | 计费账户 | `account=proj01` |
-| `dependency` | 作业依赖 | `dependency=afterok:12345` |
-
-#### 平台必填字段（CMA HPC）
-
-| 指令 | 说明 | 示例 |
-|---|---|---|
-| `project` | 项目任务号，由 HPC 管理员提供 | `project=105-01-01` |
-| `application` | 应用名称，由 HPC 管理员提供。使用 `modelname` 查看可用选项，如 `GRAPES`、`MCV` 等 | `application=GRAPES` |
-
-### 后端条件指令
-
-如果同一脚本在不同后端需要不同值，可使用 `[scheduler=<name>]` 条件前缀：
+本地构建文档：
 
 ```bash
-#ORVIX queue=normal
-#ORVIX [scheduler=slurm] account=slurm_proj
-#ORVIX [scheduler=donau] account=donau_proj
+pip install -r docs/requirements.txt
+cd docs && make html           # 输出到 docs/build/html/
 ```
 
-在上例中，`queue=normal` 适用于所有后端；`account` 的值根据当前后端选择。条件行可以覆盖之前同键的无条件指令。
+文档内容概览：
 
-## 命令
-
-### `orvix generate [flags] <脚本>`
-
-解析脚本中的 `#ORVIX` 指令，生成翻译后的脚本并写入 `.submit` 文件，**不提交**到调度器，也不生成 `.info.yaml`。
-
-```bash
-$ orvix generate case/job/serial/orvix_serial.sh
-Generated: /abs/path/orvix_serial.sh.submit
-```
-
-选项：
-
-```bash
-orvix generate --scheduler=slurm script.sh            # 强制指定调度器后端
-orvix generate --output-script=/tmp/submit.sh script.sh  # 自定义输出路径
-```
-
-### `orvix submit <脚本>`
-
-解析脚本中的 `#ORVIX` 指令，生成翻译后的脚本并提交。
-
-```bash
-$ orvix submit case/job/serial/orvix_serial.sh
-12345678
-```
-
-选项：
-
-```bash
-orvix submit --dry-run script.sh                    # 仅打印翻译后的脚本，不提交
-orvix submit --scheduler=slurm script.sh            # 强制指定调度器后端，覆盖脚本中的设置
-orvix submit --watch script.sh                      # 提交后持续轮询状态直到作业结束
-orvix submit --watch --watch-interval=10s script.sh # 自定义轮询间隔（默认：5s）
-orvix submit --no-log script.sh                     # 不生成 .submit.log（默认成功/失败均会生成）
-```
-
-### `orvix status <info.yaml>`
-
-查询作业状态。
-
-```bash
-$ orvix status case/job/serial/orvix_serial.info.yaml
-RUNNING
-```
-
-### `orvix watch [flags] <info.yaml>`
-
-持续轮询作业状态，直到作业到达终止状态（COMPLETED、FAILED、CANCELLED、TIMEOUT）。
-
-```bash
-$ orvix watch case/job/serial/orvix_serial.info.yaml
-[2026-05-22T10:00:00Z] PENDING
-[2026-05-22T10:00:05Z] RUNNING
-[2026-05-22T10:02:00Z] COMPLETED
-```
-
-选项：
-
-```bash
-orvix watch -i 10s case/job/serial/orvix_serial.info.yaml  # 每 10 秒轮询一次（默认：5s）
-```
-
-### `orvix kill <info.yaml>`
-
-终止作业。对已结束的作业重复执行 kill 视为成功（幂等）。
-
-```bash
-$ orvix kill case/job/serial/orvix_serial.info.yaml
-```
-
-Slurm 后端的默认行为是分阶段优雅终止，让作业脚本的信号 trap（如 ecFlow head.h 的
-`ecflow_client --abort` 上报）有机会执行：
-
-1. `scancel --full --signal=TERM <jobid>` —— TERM 同时送达 batch 脚本及其全部子进程
-   （裸 `scancel` 只发给 batch shell 本身，脚本若在前台等待子进程，trap 会被推迟到
-   子进程自行结束后才执行，通常来不及）；
-2. 轮询作业状态，最多等待宽限期（默认 30 秒，可用 `ORVIX_SLURM_KILL_GRACE`
-   环境变量覆盖，单位秒，`0` 表示立即升级）；
-3. 超时仍未结束则兜底 `scancel <jobid>`（controller cancel 路径：SIGCONT+SIGTERM、
-   KillWait 后 SIGKILL，并把作业标记为 CANCELLED）。
-
-`orvix kill -s <信号>` 显式指定信号时保持单次发送语义，但同样附加 `--full`，
-确保信号能到达 batch 脚本的子进程。
-
-## 生成的文件
-
-### `orvix submit` 生成的文件
-
-提交 `path/to/script.sh` 后，会在**同一目录**下创建以下文件：
-
-```
-path/to/script.sh              # 原始脚本（不变）
-path/to/script.sh.submit       # 实际执行的翻译后脚本
-path/to/script.sh.info.yaml    # 作业元数据（status / kill / watch 使用）
-path/to/script.sh.submit.log   # 提交日志（默认生成，记录提交命令和结果）
-```
-
-- 提交成功时，会生成 `.submit`、`.info.yaml` 和 `.submit.log`。
-- 提交失败时（如解析错误、调度器拒绝），会生成 `.submit.log`，记录错误和时间戳。
-- 使用 `--no-log` 可关闭 `.submit.log` 的生成（成功和失败均不生成）。
-- 重新提交会覆盖同名现有文件。
-
-### `orvix generate` 生成的文件
-
-`orvix generate` 仅生成 `.submit` 文件，**不**生成 `.info.yaml`：
-
-```
-path/to/script.sh              # 原始脚本（不变）
-path/to/script.sh.submit       # 翻译后的脚本
-```
-
-适用于需要预生成脚本、手动检查后再提交的场景。
-
-`info.yaml` 示例：
-
-```yaml
-scheduler: slurm
-job_id: "12345678"
-submitted_at: 2026-05-10T11:27:22.107722252Z
-script_source: /abs/path/script.sh
-script_generated: /abs/path/script.sh.submit
-submit_dir: /abs/path
-hostname: login01
-user: wangdp
-directives:
-    - key: scheduler
-      value: slurm
-    - key: queue
-      value: normal
-    - key: nodes
-      value: "2"
-```
-
-## 支持的调度器后端
-
-| 后端 | 说明 |
-|---|---|
-| `slurm` | 转换为 `#SBATCH` 指令，通过 `sbatch` 提交到 SLURM 集群 |
-| `donau` | 转换为 `#DSUB` 指令，通过 `dsub` 提交到华为 Donau 调度系统 |
-| `local` | 作为本地子进程直接运行，适用于本地测试 |
-
-### SLURM 指令映射
-
-使用 `scheduler=slurm` 时，orvix 指令到 SLURM 指令的映射如下：
-
-| orvix 指令 | SLURM 指令 | 说明 |
-|---|---|---|
-| `job-name` | `--job-name` | 作业名称 |
-| `output` | `--output` | 标准输出文件 |
-| `error` | `--error` | 标准错误文件 |
-| `nodes` | `--nodes` | 节点数量 |
-| `ntasks` | `--ntasks` | 任务总数 |
-| `ntasks-per-node` | `--ntasks-per-node` | 每节点任务数 |
-| `cpus-per-task` | `--cpus-per-task` | 每任务 CPU 数 |
-| `time` | `--time` | 时间限制（`HH:MM:SS`） |
-| `queue` | `--partition` | 分区 / 队列 |
-| `account` | `--account` | 计费账户 |
-| `project` | `--wckey` | 项目任务号 |
-| `application` | `--comment` | 应用名称 |
-| `exclusive` | `--exclusive` | 独占节点访问 |
-| `nodelist` | `--nodelist` | 指定节点列表 |
-| `memory` | `--mem` | 内存需求 |
-| `dependency` | `--dependency` | 作业依赖 |
-
-### Donau 指令映射
-
-使用 `scheduler=donau` 时，orvix 指令到 Donau 指令的映射如下：
-
-| orvix 指令 | Donau 指令 | 说明 |
-|---|---|---|
-| `job-name` | `-n` | 作业名称 |
-| `output` | `-oo` | 标准输出文件 |
-| `error` | `-eo` | 标准错误文件 |
-| `nodes` | `-nn` | 节点数量 |
-| `ntasks-per-node` | `-tpn` | 每节点任务数 |
-| `cpus-per-task` | `-R "cpu=X"` | 每任务 CPU 数（与 `memory` 合并为一条 `-R` 指令） |
-| `memory` | `-R "mem=Y"` | 内存需求（与 `cpus-per-task` 合并为一条 `-R` 指令） |
-| `time` | `-T` | 时间限制（`HH:MM:SS` 自动转换为秒；时长字符串如 `8h` 原样传递） |
-| `queue` | `-q` | 队列 |
-| `account` | `-A` | 账户 |
-| `project` | `-d` | 项目号（与 `application` 合并为 `-d "project:application"`） |
-| `application` | `-d` | 应用名称（与 `project` 合并为 `-d "project:application"`） |
-| `exclusive` | `--exclusive` | 独占节点访问（可带值或不带值） |
-| `nodelist` | `-pn` | 指定节点列表（自动加引号） |
-| `job-type` | `--job_type` | 作业类型 |
-
-注意：`ntasks` 和 `dependency` 在 Donau 中无对应指令，会被静默忽略。
+- **快速上手** — 安装与第一个作业
+- **使用指南** — `#ORVIX` 指令参考、命令参考、生成的文件、调度器后端与指令映射
+- **参考** — 与 takflow jobspec 契约的关系
+- **开发** — 架构说明、新增指令清单
 
 ## 许可证
 
