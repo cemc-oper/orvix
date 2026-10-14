@@ -1,8 +1,13 @@
-// Package spec vendors the canonical takflow jobspec contract and exposes it to
-// the rest of orvix. The schema (jobspec.schema.json) is the single source of
-// truth, authored in the takflow repo; this is a verbatim vendored copy kept in
-// sync by the conformance harness. Do not hand-edit — re-vendor from takflow.
-package spec
+// Package jobspec is the canonical home of the jobspec contract: the
+// language-neutral job-run resource description shared by workflow generators
+// (takflow and its applications) and orvix. The schema (jobspec.schema.json),
+// the contract VERSION, and the conformance vectors/goldens live here and are
+// authoritative; takflow vendors a read-only copy pinned to an orvix ref.
+//
+// The package exposes the schema to the rest of orvix via go:embed of the
+// files next to it, so there is exactly one copy of the contract in this
+// repository.
+package jobspec
 
 import (
 	_ "embed"
@@ -21,7 +26,7 @@ type schemaDoc struct {
 	Properties map[string]json.RawMessage `json:"properties"`
 }
 
-// Version returns the vendored contract version (semantic version string).
+// Version returns the contract version (semantic version string).
 func Version() string {
 	return strings.TrimSpace(versionRaw)
 }
@@ -30,7 +35,7 @@ func Version() string {
 func PropertyKeys() []string {
 	var doc schemaDoc
 	if err := json.Unmarshal(schemaJSON, &doc); err != nil {
-		panic("vendored jobspec.schema.json is not valid JSON: " + err.Error())
+		panic("jobspec.schema.json is not valid JSON: " + err.Error())
 	}
 	keys := make([]string, 0, len(doc.Properties))
 	for k := range doc.Properties {

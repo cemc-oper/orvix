@@ -6,6 +6,8 @@
 
 ```
 cmd/                  cobra 命令定义（submit / generate / status / watch / kill / version）
+spec/jobspec/         jobspec 契约权威所在：schema、VERSION、conformance 向量与
+                      golden，以及 go:embed 访问包（spec.go）
 internal/
 ├── directive/        #ORVIX 指令解析器
 ├── scheduler/        调度器后端接口与实现（slurm / donau / local）
@@ -13,7 +15,6 @@ internal/
 ├── submit/           提交管线编排
 ├── jobinfo/          .info.yaml sidecar 读写
 ├── watch/            状态轮询
-├── spec/             vendor 的 takflow jobspec 契约（只读）
 ├── version/          版本推导
 └── log/              调试日志（--debug）
 ```
@@ -78,7 +79,7 @@ type Generator func(d *directive.Set) (string, bool)
 - 指令必须在脚本初始注释块内；标记为恰好大写 `#ORVIX`，`#` 与 `ORVIX` 之间无空格。
 - 支持条件指令 `#ORVIX [scheduler=<name>] key=value`（目前仅支持 scheduler 条件），
   条件指令覆盖同键的无条件指令。
-- 未知键静默丢弃，不做透传。指令全集与 takflow jobspec 契约一致
+- 未知键静默丢弃，不做透传。指令全集即 `spec/jobspec/` 契约的指令投影
   （见 [jobspec 契约](../reference/jobspec.md)）。
 
 ## 测试约定

@@ -92,7 +92,7 @@ cd docs && make html           # 输出到 docs/build/html/
 
 - **快速上手** — 安装与第一个作业
 - **使用指南** — `#ORVIX` 指令参考、命令参考、生成的文件、调度器后端与指令映射
-- **参考** — 与 takflow jobspec 契约的关系
+- **参考** — jobspec 契约（本仓库权威持有，takflow vendor 消费）
 - **开发** — 架构说明、新增指令清单
 
 ## 许可证

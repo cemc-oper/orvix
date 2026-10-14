@@ -26,6 +26,22 @@ jobs:
       - name: test
         run: go test ./...
 
+  golden:
+    # jobspec contract gate: generated output must match the committed goldens
+    # under spec/jobspec/conformance/golden/. Also covered by `go test ./...`
+    # above; kept as a separate job so contract drift is visible by name.
+    name: jobspec golden
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: conformance golden diff
+        run: go test ./spec/jobspec/ -run TestConformanceGolden -v
+
   build:
     name: build (${{ matrix.goos }}/${{ matrix.goarch }})
     needs: test

@@ -11,7 +11,7 @@ OUTPUT := $(BIN_DIR)/$(BINARY)
 
 GO_BUILD_FLAGS ?=
 
-.PHONY: all build build-all build-linux-amd64 build-linux-arm64 test vet tidy clean run help
+.PHONY: all build build-all build-linux-amd64 build-linux-arm64 test regen-golden vet tidy clean run help
 
 all: build
 
@@ -30,6 +30,12 @@ build-all: build build-linux-amd64 build-linux-arm64
 
 test:
 	$(GO) test $(GO_BUILD_FLAGS) $(PKG)
+
+# Regenerate jobspec conformance goldens from the current build.
+# Use after an intentional change to generated output, and review the
+# resulting diff under spec/jobspec/conformance/golden/ in the same commit.
+regen-golden:
+	$(GO) test ./spec/jobspec/ -run TestConformanceGolden -update
 
 vet:
 	$(GO) vet $(GO_BUILD_FLAGS) $(PKG)
@@ -50,6 +56,7 @@ help:
 	@echo "  build-linux-amd64      Cross-compile for Linux AMD64"
 	@echo "  build-linux-arm64      Cross-compile for Linux ARM64"
 	@echo "  test                   Run unit tests"
+	@echo "  regen-golden           Regenerate jobspec conformance goldens (review the diff)"
 	@echo "  vet                    Run go vet"
 	@echo "  tidy                   Sync go.mod / go.sum"
 	@echo "  clean                  Remove $(BIN_DIR)/"

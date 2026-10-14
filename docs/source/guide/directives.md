@@ -36,8 +36,8 @@ echo "running"
 
 ## 指令全集
 
-orvix 共识别 19 个指令键。该集合与 takflow 的 jobspec 契约保持一一对应
-（见 [jobspec 契约](../reference/jobspec.md)）。
+orvix 共识别 19 个指令键。该集合即 jobspec 契约的指令投影（本仓库权威持有，
+见 [jobspec 契约](../reference/jobspec.md)）。
 
 ### 调度器与标识
 

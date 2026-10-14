@@ -1,33 +1,27 @@
 # 新增一个指令
 
-`#ORVIX` 指令集是 takflow jobspec 契约的投影，因此新增一个指令键是**跨仓库**的变更，
-需要按以下清单逐项落实，缺一不可。
+`#ORVIX` 指令集是 jobspec 契约的投影，而契约由本仓库权威持有——新增一个指令键
+是**单仓库**变更，按以下清单逐项落实，缺一不可。唯一的跨仓库动作在最后：
+通知消费方（takflow）升 pin 同步。
 
 ## 变更清单
 
-### 1. 契约（takflow 仓库）
+### 1. 契约（本仓库 `spec/jobspec/`）
 
-在 takflow 侧修改契约，这是唯一权威来源：
+- `spec/jobspec/jobspec.schema.json`：新增 snake_case 字段（如 `new_key`），
+  写明类型与说明；
+- 按契约版本规则（语义化版本：新增可选键为 MINOR）更新 `spec/jobspec/VERSION`；
+- `spec/jobspec/spec_test.go` 会随即变红（解析器词汇表与新 schema 不一致），
+  这正是契约门的提示。
 
-- `framework/takflow/spec/jobspec/jobspec.schema.json`：新增 snake_case 字段
-  （如 `new_key`），写明类型与说明；
-- 按契约版本规则更新 `framework/takflow/spec/jobspec/VERSION`；
-- 更新 takflow 的 jobspec 文档与 `TaskResource` → `ResourceSpec` 的编译逻辑
-  （如果该键需要从应用层配置生成）。
-
-### 2. vendor 副本（orvix 仓库）
-
-把更新后的 `jobspec.schema.json` 和 `VERSION` 复制到 `internal/spec/`。
-`internal/spec/spec_test.go` 会校验 vendor 副本与解析器指令集一致。
-
-### 3. 解析器（orvix 仓库）
+### 2. 解析器（本仓库）
 
 - `internal/directive/parser.go`：在 `KnownDirectives` 中加入连字符形式的键
   （如 `new-key`）；
 - `internal/directive/parser_test.go`：补充解析测试（带值 / 裸键 / 条件形式，
   视键的语义而定）。
 
-### 4. 各调度器后端（orvix 仓库）
+### 3. 各调度器后端（本仓库）
 
 为每个后端决定该键的映射，并在对应 `PreambleFor` 的 generator 列表中声明：
 
@@ -39,19 +33,28 @@
 
 为每个后端的映射补充单元测试。
 
-### 5. conformance 向量（takflow 仓库）
+### 4. conformance 向量与 golden（本仓库）
 
-在 `framework/takflow/spec/jobspec/conformance/vectors/` 增加携带新指令的脚本向量，
-更新 `golden/{slurm,donau,local}/` 的期望输出，跑通一致性比对。
+- 在 `spec/jobspec/conformance/vectors/` 增加（或修改）携带新指令的脚本向量；
+- 跑 `make regen-golden` 重新生成 `golden/{slurm,donau,local}/` 基线，
+  diff 随同一 commit 评审；
+- CI 的 `jobspec golden` job（`TestConformanceGolden`）是这道门的常态守卫。
 
-### 6. 文档
+### 5. 文档（本仓库）
 
 - `docs/source/guide/directives.md`：指令全集表格加一行；
 - `docs/source/guide/schedulers.md`：各后端映射表加一行（或注明忽略）。
 
+### 6. 通知消费方（takflow 仓库）
+
+契约合并（并发布/打 tag）后，通知 takflow 升 pin：在 takflow 侧运行
+`scripts/sync_jobspec.py --orvix-ref <新版 orvix ref>`，vendor 副本与
+`ORVIX_VERSION` pin 一并更新。takflow 渲染器如需从应用层配置生成新键
+（`TaskResource` → `ResourceSpec` 编译），在 takflow 那个 PR 里一并处理。
+
 ## 命名约定
 
 - schema 字段用 snake_case（`new_key`），`#ORVIX` 指令用连字符（`new-key`），
-  两者由 `internal/spec/spec.go` 的 `DirectiveKeys()` 机械转换；
+  两者由 `spec/jobspec/spec.go` 的 `DirectiveKeys()` 机械转换；
 - 调度器中立的布尔键默认值要为所有后端可解释的语义
   （参考 `requeue`：默认 `true`，`false` 时才产出调度器指令）。
