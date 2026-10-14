@@ -154,6 +154,7 @@ func (d *Donau) PreambleFor(ds *directive.Set) ([]string, error) {
 //   - pure integer (already seconds)
 //   - MM:SS
 //   - HH:MM:SS
+//
 // Anything else (e.g. "8h", "1h30m") returns an error so the caller can
 // pass it through unchanged.
 func timeToSeconds(t string) (int, error) {

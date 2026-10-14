@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	mu     sync.Mutex
+	mu      sync.Mutex
 	enabled bool
 	out     io.Writer = os.Stderr
 )

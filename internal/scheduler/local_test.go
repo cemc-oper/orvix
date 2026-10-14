@@ -138,7 +138,7 @@ func awaitFileContent(t *testing.T, path, want string) {
 func TestLocalSubmitRedirectsOutputAndError(t *testing.T) {
 	dir := t.TempDir()
 	script := writeJobScript(t, dir)
-	d, err := directive.Parse([]byte("#ORVIX scheduler=local\n#ORVIX output="+dir+"/job.out\n#ORVIX error="+dir+"/job.err\n"))
+	d, err := directive.Parse([]byte("#ORVIX scheduler=local\n#ORVIX output=" + dir + "/job.out\n#ORVIX error=" + dir + "/job.err\n"))
 	require.NoError(t, err)
 
 	_, _, err = NewLocal(d).Submit(script)
@@ -153,7 +153,7 @@ func TestLocalSubmitRedirectsOutputAndError(t *testing.T) {
 func TestLocalSubmitMergesStderrIntoOutputWhenNoErrorDirective(t *testing.T) {
 	dir := t.TempDir()
 	script := writeJobScript(t, dir)
-	d, err := directive.Parse([]byte("#ORVIX scheduler=local\n#ORVIX output="+dir+"/job.out\n"))
+	d, err := directive.Parse([]byte("#ORVIX scheduler=local\n#ORVIX output=" + dir + "/job.out\n"))
 	require.NoError(t, err)
 
 	_, _, err = NewLocal(d).Submit(script)
@@ -180,7 +180,7 @@ func TestLocalSubmitZeroValueKeepsLegacyStreams(t *testing.T) {
 func TestLocalSubmitMissingOutputDirFails(t *testing.T) {
 	dir := t.TempDir()
 	script := writeJobScript(t, dir)
-	d, err := directive.Parse([]byte("#ORVIX scheduler=local\n#ORVIX output="+dir+"/no/such/dir/job.out\n"))
+	d, err := directive.Parse([]byte("#ORVIX scheduler=local\n#ORVIX output=" + dir + "/no/such/dir/job.out\n"))
 	require.NoError(t, err)
 
 	_, _, err = NewLocal(d).Submit(script)

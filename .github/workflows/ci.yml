@@ -10,6 +10,22 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - name: vet
+        run: go vet ./...
+
   test:
     name: test
     runs-on: ubuntu-latest
@@ -20,11 +36,17 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: vet
-        run: go vet ./...
+      - name: test (race detector + coverage)
+        # -race matters here: local backend / signal handling are concurrent.
+        # CGO stays enabled (default) since -race requires it.
+        run: go test -race -coverprofile=coverage.out ./...
 
-      - name: test
-        run: go test ./...
+      - name: Upload coverage profile
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+          if-no-files-found: ignore
 
   golden:
     # jobspec contract gate: generated output must match the committed goldens
