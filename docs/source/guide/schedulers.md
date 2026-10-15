@@ -106,7 +106,8 @@ orvix 目前支持三个调度器后端：
 
 ## 归一化状态
 
-`orvix watch` 输出的是归一化状态（`orvix status` 输出调度器原始状态）。
+`orvix watch` 输出的是归一化状态；`orvix status` 默认输出调度器原始状态，
+加 `--format json` 时同时给出两者（`state` / `raw_state` 字段）。
 六个归一化状态中，`COMPLETED`、`FAILED`、`CANCELLED`、`TIMEOUT` 为终止状态：
 
 | 归一化状态 | SLURM 原始状态 | Donau 原始状态 | local |
@@ -118,3 +119,6 @@ orvix 目前支持三个调度器后端：
 | `CANCELLED` | CANCELLED | CANCELLED、CANCELED | — |
 | `TIMEOUT` | TIMEOUT | TIMEOUT | — |
 | `UNKNOWN` | 其他 | 其他 | 其他 |
+
+SLURM 的 sacct 可能给终止状态带限定后缀（如 `CANCELLED by 30255`），归一化时只取
+首个词。

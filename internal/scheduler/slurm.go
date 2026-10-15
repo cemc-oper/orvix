@@ -279,7 +279,13 @@ func slurmKillGrace() time.Duration {
 }
 
 func (s *SLURM) NormalizeState(raw string) JobState {
-	switch strings.ToUpper(raw) {
+	state := strings.ToUpper(strings.TrimSpace(raw))
+	// sacct may qualify terminal states, e.g. "CANCELLED by 30255" — keep
+	// only the leading state token.
+	if i := strings.IndexByte(state, ' '); i > 0 {
+		state = state[:i]
+	}
+	switch state {
 	case "RUNNING":
 		return StateRunning
 	case "PENDING", "CONFIGURING":

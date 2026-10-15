@@ -192,3 +192,30 @@ func TestSlurmKillGraceEnv(t *testing.T) {
 	t.Setenv("ORVIX_SLURM_KILL_GRACE", "-3")
 	assert.Equal(t, 30*time.Second, slurmKillGrace())
 }
+
+func TestSlurmNormalizeState(t *testing.T) {
+	s := &SLURM{}
+	cases := []struct {
+		raw  string
+		want JobState
+	}{
+		{"RUNNING", StateRunning},
+		{"PENDING", StatePending},
+		{"CONFIGURING", StatePending},
+		{"COMPLETED", StateCompleted},
+		{"FAILED", StateFailed},
+		{"NODE_FAIL", StateFailed},
+		{"OUT_OF_MEMORY", StateFailed},
+		{"CANCELLED", StateCancelled},
+		{"TIMEOUT", StateTimeout},
+		{"SUSPENDED", StateUnknown},
+		// sacct qualifies some terminal states with a trailing clause.
+		{"CANCELLED by 30255", StateCancelled},
+		{"cancelled by 30255", StateCancelled},
+		{"TIMEOUT by 30255", StateTimeout},
+		{"  COMPLETED  ", StateCompleted},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, s.NormalizeState(c.raw), "raw=%q", c.raw)
+	}
+}

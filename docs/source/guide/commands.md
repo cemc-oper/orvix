@@ -53,15 +53,32 @@ $ orvix submit case/job/serial/orvix_serial.sh
 ## orvix status
 
 ```bash
-orvix status <info.yaml>
+orvix status [--format text|json] <info.yaml>
 ```
 
-查询一次作业状态，向 stdout 打印调度器返回的原始状态字符串：
+查询一次作业状态，默认（`--format text`）向 stdout 打印调度器返回的原始状态字符串：
 
 ```bash
 $ orvix status case/job/serial/orvix_serial.info.yaml
 RUNNING
 ```
+
+`--format json` 输出机器可读的 JSON 对象，额外携带归一化状态（供脚本/CI 消费）：
+
+```bash
+$ orvix status --format json case/job/serial/orvix_serial.info.yaml
+{"job_id":"12345","scheduler":"slurm","state":"COMPLETED","raw_state":"COMPLETED","terminal":true}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `job_id` | 作业号（来自 info.yaml） |
+| `scheduler` | 调度器后端名 |
+| `state` | 归一化状态（`PENDING`/`RUNNING`/`COMPLETED`/`FAILED`/`CANCELLED`/`TIMEOUT`/`UNKNOWN`） |
+| `raw_state` | 调度器原始状态字符串 |
+| `terminal` | 是否为终止状态 |
+
+各后端的原始状态到归一化状态的映射见 [调度器后端](schedulers.md)。
 
 ## orvix watch
 
