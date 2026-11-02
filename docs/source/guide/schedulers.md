@@ -55,6 +55,10 @@ orvix 目前支持三个调度器后端：
 3. 超时仍未结束则兜底 `scancel <jobid>`（controller cancel 路径：SIGCONT+SIGTERM、
    KillWait 后 SIGKILL，并把作业标记为 CANCELLED）。
 
+PENDING（含 CONFIGURING）作业直接走 `scancel <jobid>`，避免 SLURM 拒绝
+`--signal` 阶段后作业仍继续排队。若信号阶段失败且作业仍存活，同样立即升级到
+普通 `scancel`；最终取消失败时才返回错误。
+
 `orvix kill -s <信号>` 显式指定信号时保持单次发送语义，但同样附加 `--full`，
 确保信号能到达 batch 脚本的子进程。
 

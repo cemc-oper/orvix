@@ -180,6 +180,10 @@ func (s *SLURM) sacctState(jobID string, reason string) (string, error) {
 //     then SIGKILL; it also marks the job CANCELLED, which the --signal
 //     path never does because it bypasses slurmctld).
 //
+// Pending jobs (including CONFIGURING) go straight to plain scancel because
+// the controller may reject the signal stage while leaving them queued.
+// A failed signal stage on a live job also escalates to plain scancel.
+//
 // An explicit signal keeps single-shot semantics but adds --full so the
 // signal reaches the batch script's children as well.
 //
@@ -196,8 +200,17 @@ func (s *SLURM) Kill(jobID string, sig os.Signal) error {
 		return nil
 	}
 
+	if raw, err := s.Status(jobID); err == nil && s.NormalizeState(raw) == StatePending {
+		log.Debugf("[slurm] job %s has not started yet, using plain scancel", jobID)
+		return s.cancel(jobID)
+	}
+
 	if err := s.scancel(jobID, "--full", "--signal=TERM"); err != nil {
-		return s.ignoreGone(jobID, err)
+		if err := s.ignoreGone(jobID, err); err == nil {
+			return nil
+		}
+		log.Debugf("[slurm] signal stage failed for job %s, escalating to plain scancel: %v", jobID, err)
+		return s.cancel(jobID)
 	}
 
 	deadline := time.Now().Add(slurmKillGrace())
@@ -218,6 +231,11 @@ func (s *SLURM) Kill(jobID string, sig os.Signal) error {
 	}
 
 	log.Debugf("[slurm] job %s still alive after grace, escalating to plain scancel", jobID)
+	return s.cancel(jobID)
+}
+
+// cancel runs plain scancel and treats an already finished job as success.
+func (s *SLURM) cancel(jobID string) error {
 	if err := s.scancel(jobID); err != nil {
 		return s.ignoreGone(jobID, err)
 	}

@@ -62,6 +62,7 @@ func init() {
 			"(falls back to the single pid for pre-process-group jobs); "+
 			"staged graceful kill for slurm "+
 			"(scancel --full --signal=TERM, plain scancel after "+
-			"ORVIX_SLURM_KILL_GRACE seconds, default 30); scheduler default for donau")
+			"ORVIX_SLURM_KILL_GRACE seconds, default 30; pending jobs "+
+			"go straight to plain scancel); scheduler default for donau")
 	rootCmd.AddCommand(killCmd)
 }

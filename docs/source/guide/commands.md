@@ -128,6 +128,8 @@ $ orvix kill case/job/serial/orvix_serial.info.yaml
   及其全部子进程，让脚本的信号 trap 有机会执行），轮询等待宽限期
   （默认 30 秒，可用环境变量 `ORVIX_SLURM_KILL_GRACE` 覆盖，单位秒，`0` 表示立即升级），
   超时仍未结束则兜底 `scancel`（controller cancel 路径，作业标记为 CANCELLED）。
+  PENDING（含 CONFIGURING）作业直接走 `scancel`；若信号阶段失败且作业仍存活，
+  也会立即升级到 `scancel`。
 - **Donau**：使用调度器默认的 `djob -T`；不支持自定义信号。
 - **local**：向作业的整个进程组发送 SIGTERM（对进程组建立之前提交的旧作业回退到单进程）。
 

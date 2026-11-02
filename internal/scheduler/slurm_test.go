@@ -122,10 +122,10 @@ func TestSlurmKillDefaultJobEndsDuringGrace(t *testing.T) {
 
 	require.NoError(t, (&SLURM{}).Kill("123", nil))
 
-	calls := stubs.calls(t)
+	calls := stubs.scancelCalls(t)
 	require.NotEmpty(t, calls)
 	assert.Equal(t, "scancel --full --signal=TERM 123", calls[0])
-	assert.Empty(t, stubs.scancelCalls(t)[1:], "fallback scancel must not run once the job is terminal")
+	assert.Empty(t, calls[1:], "fallback scancel must not run once the job is terminal")
 }
 
 func TestSlurmKillDefaultEscalatesAfterGrace(t *testing.T) {
@@ -156,6 +156,43 @@ func TestSlurmKillDefaultZeroGraceEscalatesImmediately(t *testing.T) {
 	assert.Equal(t, "scancel 123", calls[1])
 }
 
+func TestSlurmKillPendingSkipsSignalStage(t *testing.T) {
+	for _, state := range []string{"PENDING", "CONFIGURING"} {
+		t.Run(state, func(t *testing.T) {
+			stubs := newStubBin(t)
+			stubs.add(t, "scancel", "exit 0")
+			stubs.add(t, "squeue", "echo "+state)
+
+			require.NoError(t, (&SLURM{}).Kill("123", nil))
+			assert.Equal(t, []string{"scancel 123"}, stubs.scancelCalls(t))
+		})
+	}
+}
+
+func TestSlurmKillRefusedSignalStageEscalates(t *testing.T) {
+	stubs := newStubBin(t)
+	stubs.add(t, "scancel", `case "$*" in
+  *--signal*) echo "scancel: error: Kill job error on job id 123: Job can not be altered now, try again later" >&2; exit 228 ;;
+  *) exit 0 ;;
+esac`)
+	stubs.add(t, "squeue", "echo RUNNING")
+
+	require.NoError(t, (&SLURM{}).Kill("123", nil))
+	assert.Equal(t, []string{
+		"scancel --full --signal=TERM 123",
+		"scancel 123",
+	}, stubs.scancelCalls(t))
+}
+
+func TestSlurmKillExplicitSignalRefusedDoesNotCancel(t *testing.T) {
+	stubs := newStubBin(t)
+	stubs.add(t, "scancel", `echo "Job can not be altered now, try again later" >&2; exit 228`)
+	stubs.add(t, "squeue", "echo PENDING")
+
+	require.ErrorContains(t, (&SLURM{}).Kill("123", syscall.SIGTERM), "Job can not be altered now")
+	assert.Equal(t, []string{"scancel --full --signal=15 123"}, stubs.scancelCalls(t))
+}
+
 func TestSlurmKillExplicitSignalAddsFull(t *testing.T) {
 	stubs := newStubBin(t)
 	stubs.add(t, "scancel", "exit 0")
@@ -181,7 +218,11 @@ func TestSlurmKillErrorPropagatesWhileJobAlive(t *testing.T) {
 	stubs.add(t, "scancel", `echo "scancel: error: some unexpected failure" >&2; exit 1`)
 	stubs.add(t, "squeue", "echo RUNNING")
 
-	assert.Error(t, (&SLURM{}).Kill("123", nil))
+	require.ErrorContains(t, (&SLURM{}).Kill("123", nil), "some unexpected failure")
+	assert.Equal(t, []string{
+		"scancel --full --signal=TERM 123",
+		"scancel 123",
+	}, stubs.scancelCalls(t))
 }
 
 func TestSlurmKillGraceEnv(t *testing.T) {
