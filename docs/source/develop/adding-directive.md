@@ -45,6 +45,11 @@
 - `docs/source/reference/directives.md`：指令全集表格与后端支持矩阵各加一行；
 - `docs/source/reference/scheduler-mapping.md`：各后端映射表加一行（或注明忽略）。
 
+同时检查相关指南页是否需要同步：新键若有使用场景或易错写法，更新
+`guide/writing-scripts.md`（配方/常见错误）、`guide/choosing-scheduler.md`（后端差异）与
+`guide/troubleshooting.md`（症状条目）。页面归属与同步要求见
+[文档编写指南](documentation.md)。
+
 ### 6. 通知消费方（takflow 仓库）
 
 契约合并（并发布/打 tag）后，通知 takflow 升 pin：在 takflow 侧运行

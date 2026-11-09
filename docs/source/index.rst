@@ -38,8 +38,12 @@ orvix 文档
    :maxdepth: 2
    :caption: 开发
 
+   develop/setup
    develop/architecture
+   develop/testing
    develop/adding-directive
+   develop/adding-scheduler
+   develop/releasing
    develop/documentation
 
 .. toctree::

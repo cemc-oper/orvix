@@ -34,7 +34,18 @@ internal/
    （作业 ID、调度器、提交命令、解析后的指令等）。
 6. **监视**（可选）— `--watch` 时 `watch.Run` 轮询状态直到终止状态。
 
-`orvix generate` 只执行 1–3 并写出 `.submit` 文件。
+`orvix generate` 只执行 1–3 并写出 `.submit` 文件。两者的产物差异：
+
+| 阶段 | generate | submit |
+|---|---|---|
+| 解析 / 选后端 / 渲染 | 是 | 是 |
+| 写 `.submit` | 是 | 是（`--dry-run` 时改写 stdout） |
+| 调用调度器提交 | 否 | 是 |
+| 写 `.info.yaml` | 否 | 是 |
+| 写 `.submit.log` | 仅失败时 | 成功与失败都写（`--no-log` 关闭） |
+| 轮询状态 | 否 | 仅 `--watch` |
+
+产物格式见 [文件格式](../reference/file-formats.md)。
 
 ## 调度器后端接口
 
@@ -76,16 +87,16 @@ type Generator func(d *directive.Set) (string, bool)
 
 ## 指令解析规则要点
 
-- 指令必须在脚本初始注释块内；标记为恰好大写 `#ORVIX`，`#` 与 `ORVIX` 之间无空格。
-- 支持条件指令 `#ORVIX [scheduler=<name>] key=value`（目前仅支持 scheduler 条件），
-  条件指令覆盖同键的无条件指令。
-- 未知键静默丢弃，不做透传。指令全集即 `spec/jobspec/` 契约的指令投影
-  （见 [jobspec 契约](../reference/jobspec.md)）。
+用户视角的语法规则见 [编写作业脚本](../guide/writing-scripts.md)，
+指令全集见 [指令参考](../reference/directives.md)。实现上需要记住的三点：
+
+- 解析在第一个非空、非注释行处停止；行首空白允许；`#ORVIX` 后必须跟空白或行尾。
+- 条件指令 `#ORVIX [scheduler=<name>] key=value` 在解析期按最终后端过滤，
+  同键后出现者覆盖先出现者。
+- 未知键静默丢弃，不做透传；`KnownDirectives` 由 `spec/jobspec` 的 schema 派生校验
+  （`spec_test.go`），不会与契约漂移（见 [jobspec 契约](../reference/jobspec.md)）。
 
 ## 测试约定
 
-- 测试使用 `stretchr/testify`（`assert` / `require`）。
-- 解析器测试（`internal/directive/parser_test.go`）覆盖引号值、裸键、条件过滤、
-  覆盖行为、畸形输入等边界。
-- 各后端测试验证指令映射与特殊逻辑（如 Donau 的时间转秒）。
-- 运行：`make test`，单包 `make test PKG=./internal/directive`。
+- 测试使用 `stretchr/testify`（`assert` / `require`），测试文件与被测代码同目录。
+- 完整的分层策略（单元 / golden / CI / HPC 实跑）与各层跑法见 [测试策略](testing.md)。
