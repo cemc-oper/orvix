@@ -75,6 +75,9 @@ pip install -r docs/requirements.txt
 cd docs && make html           # 输出到 docs/build/html/
 ```
 
+提交文档改动前可在仓库根目录跑 `make docs-html`：严格构建（警告即失败），
+并校验指令参考表是否与 jobspec 契约一致。
+
 ## 开发
 
 ```bash

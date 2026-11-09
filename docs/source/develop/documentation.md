@@ -69,6 +69,30 @@
 - 修改 CI、构建或发布流程时，同步更新 `develop/setup.md` / `develop/testing.md` /
   `develop/releasing.md`。
 
+## 生成的指令表格
+
+`reference/directives.md` 的**分组表与后端支持矩阵不是手写的**，而是生成后 include 的：
+
+| 角色 | 文件 |
+|---|---|
+| 键集合、类型、默认值（权威） | `spec/jobspec/jobspec.schema.json` |
+| 中文说明、示例、后端摘要、分组 | `docs/data/directives.json` |
+| 生成脚本 | `docs/tools/generate_directive_tables.py`（仅用 Python 标准库） |
+| 生成产物（不要手改） | `docs/source/reference/_generated/directive-tables.md` |
+
+```bash
+make docs-directives   # 重新生成
+make docs-check        # 校验产物是否与 schema/数据一致，不一致即失败并给出 diff
+make docs-html         # 严格构建文档（先跑 docs-check）
+```
+
+生成脚本会校验两侧键集合完全一致、分组无遗漏无重复、每键都有说明/示例/三后端摘要，
+因此**契约加了键而文档数据没跟上会直接报错**。修改契约或指令说明后，
+把重新生成的片段随同一个 commit 提交。
+
+其余页面仍按 SSOT 表手工维护；`_generated/` 目录已在 `conf.py` 的 `exclude_patterns`
+中排除，不会被当成独立文档。
+
 ## 本地构建
 
 ```bash
@@ -76,11 +100,18 @@ pip install -r docs/requirements.txt
 cd docs && make html           # 输出 docs/build/html/
 ```
 
-严格模式（警告即失败），提交前建议执行：
+严格模式（警告即失败）加指令表漂移校验，提交前建议执行（在仓库根目录）：
+
+```bash
+make docs-html
+```
+
+等价于：
 
 ```bash
 cd docs
 sphinx-build -b html -W --keep-going -a -E source build/html
 ```
 
-线上版本由 Read the Docs 构建（配置 `.readthedocs.yaml`，Sphinx 配置 `docs/source/conf.py`）。
+线上版本由 Read the Docs 构建（配置 `.readthedocs.yaml`，Sphinx 配置 `docs/source/conf.py`）；
+CI 的 `docs` job 也会执行漂移校验与严格构建。

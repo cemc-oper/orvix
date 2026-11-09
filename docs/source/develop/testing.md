@@ -47,6 +47,7 @@ make regen-golden      # 即 go test ./spec/jobspec/ -run TestConformanceGolden 
 | `lint` | `gofmt -l .` 必须为空 + `go vet ./...` |
 | `test` | `go test -race -coverprofile=coverage.out ./...`，覆盖率作为 artifact 上传 |
 | `jobspec golden` | 单独跑 `TestConformanceGolden`，让契约漂移按名字可见 |
+| `docs` | 指令表漂移校验（`make docs-check`）+ 严格文档构建（`make docs-html`，警告即失败） |
 | `build` | linux/amd64 与 linux/arm64 交叉编译（CGO_ENABLED=0） |
 
 发布流程见 [发布流程](releasing.md)。
@@ -85,7 +86,7 @@ runbook 见其 `docs/ecflow.md`；集成方式本身见 [与 ecFlow 集成](../g
 
 | 改动类型 | 最小验证 |
 |---|---|
-| 仅文档 | 严格模式文档构建，见 [文档编写指南](documentation.md) |
+| 仅文档 | `make docs-html`（含指令表漂移校验 + 严格构建），见 [文档编写指南](documentation.md) |
 | 内部重构（无行为变化） | `make test` + `go vet` |
 | 指令解析、脚本改写、后端映射 | 单元测试 + golden + HPC 实跑 |
 | kill / 信号 / 状态 | 单元测试（含 `-race`）+ HPC 实跑（含 ecFlow kill 链路） |

@@ -1,4 +1,5 @@
 GO           ?= go
+PYTHON       ?= python3
 BIN_DIR      ?= bin
 PKG          ?= ./...
 # CGO disabled by default: produce a fully static binary with no libc
@@ -11,7 +12,7 @@ OUTPUT := $(BIN_DIR)/$(BINARY)
 
 GO_BUILD_FLAGS ?=
 
-.PHONY: all build build-all build-linux-amd64 build-linux-arm64 test regen-golden vet tidy clean run help
+.PHONY: all build build-all build-linux-amd64 build-linux-arm64 test regen-golden vet tidy clean run help docs-directives docs-check docs-html
 
 all: build
 
@@ -49,6 +50,20 @@ clean:
 run: build
 	./$(OUTPUT) $(ARGS)
 
+# Regenerate the directive reference tables from the jobspec schema
+# (spec/jobspec/jobspec.schema.json) plus docs/data/directives.json.
+# Commit the regenerated fragment together with the contract change.
+docs-directives:
+	$(PYTHON) docs/tools/generate_directive_tables.py
+
+# Drift gate used by CI: the committed fragment must match the schema and data.
+docs-check:
+	$(PYTHON) docs/tools/generate_directive_tables.py --check
+
+# Strict documentation build (warnings as errors), includes the drift gate.
+docs-html: docs-check
+	$(PYTHON) -m sphinx -b html -W --keep-going -a -E docs/source docs/build/html
+
 help:
 	@echo "Targets:"
 	@echo "  build                  Compile orvix for the current platform"
@@ -62,6 +77,9 @@ help:
 	@echo "  clean                  Remove $(BIN_DIR)/"
 	@echo "  run                    Build, then run with ARGS, e.g. make run ARGS=\"submit --dry-run examples/hello.sh\""
 	@echo "  release-snapshot       GoReleaser dry-run (release artifacts to dist/, no publish)"
+	@echo "  docs-directives        Regenerate the directive reference tables from the schema"
+	@echo "  docs-check             Check the committed directive tables for drift"
+	@echo "  docs-html              Strict docs build (warnings as errors), includes docs-check"
 	@echo ""
 	@echo "Variables:"
 	@echo "  GO_BUILD_FLAGS         Extra flags for go build/test/vet"

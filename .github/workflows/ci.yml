@@ -64,6 +64,27 @@ jobs:
       - name: conformance golden diff
         run: go test ./spec/jobspec/ -run TestConformanceGolden -v
 
+  docs:
+    # Documentation gate: directive tables must match the jobspec schema and
+    # the whole site must build with warnings treated as errors.
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install doc dependencies
+        run: pip install -r docs/requirements.txt
+
+      - name: Directive tables drift check
+        run: make docs-check
+
+      - name: Strict sphinx build
+        run: make docs-html
+
   build:
     name: build (${{ matrix.goos }}/${{ matrix.goarch }})
     needs: test

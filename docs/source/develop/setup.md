@@ -75,9 +75,13 @@ go run . submit --debug --dry-run examples/hello.sh
 | `clean` | 删除 `bin/` |
 | `run` | 构建后以 `ARGS` 运行 |
 | `release-snapshot` | GoReleaser 本地预演，产物到 `dist/`，不发布 |
+| `docs-directives` | 从契约 schema 重新生成指令参考表格 |
+| `docs-check` | 校验指令表格是否存在漂移 |
+| `docs-html` | 严格构建文档（警告即失败），先跑 `docs-check` |
 | `help` | 打印目标与变量说明 |
 
-可用变量：`GO_BUILD_FLAGS`（附加构建/测试参数）、`CGO_ENABLED`（默认 0）、`PKG`、`ARGS`。
+可用变量：`GO_BUILD_FLAGS`（附加构建/测试参数）、`CGO_ENABLED`（默认 0）、`PKG`、`ARGS`、
+`PYTHON`（文档相关目标使用的解释器，默认 `python3`）。
 
 ## 下一步
 

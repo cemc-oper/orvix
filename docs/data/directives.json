@@ -1,0 +1,106 @@
+{
+  "groups": [
+    {"title": "调度与标识", "keys": ["scheduler", "job-name", "queue"]},
+    {"title": "计算资源", "keys": ["nodes", "ntasks", "ntasks-per-node", "cpus-per-task", "time", "memory", "exclusive", "nodelist"]},
+    {"title": "输入输出", "keys": ["output", "error"]},
+    {"title": "作业控制", "keys": ["account", "dependency", "job-type", "requeue"]},
+    {"title": "平台必填字段（CMA HPC）", "keys": ["project", "application"]}
+  ],
+  "directives": {
+    "scheduler": {
+      "description": "目标后端：`slurm` / `donau` / `local`",
+      "example": "scheduler=slurm",
+      "backends": {"slurm": "选择后端", "donau": "选择后端", "local": "选择后端"}
+    },
+    "job-name": {
+      "description": "作业名称",
+      "example": "job-name=fcst",
+      "backends": {"slurm": "`--job-name`", "donau": "`-n`", "local": "忽略"}
+    },
+    "queue": {
+      "description": "分区 / 队列（规范键名是 `queue`，旧的 `partition` 已不存在，会被静默丢弃）",
+      "example": "queue=normal",
+      "backends": {"slurm": "`--partition`", "donau": "`-q`", "local": "忽略"}
+    },
+    "nodes": {
+      "description": "节点数量",
+      "example": "nodes=2",
+      "backends": {"slurm": "`--nodes`", "donau": "`-nn`", "local": "忽略"}
+    },
+    "ntasks": {
+      "description": "任务总数",
+      "example": "ntasks=8",
+      "backends": {"slurm": "`--ntasks`", "donau": "**忽略**", "local": "忽略"}
+    },
+    "ntasks-per-node": {
+      "description": "每节点任务数",
+      "example": "ntasks-per-node=4",
+      "backends": {"slurm": "`--ntasks-per-node`", "donau": "`-tpn`", "local": "忽略"}
+    },
+    "cpus-per-task": {
+      "description": "每任务 CPU 数",
+      "example": "cpus-per-task=4",
+      "backends": {"slurm": "`--cpus-per-task`", "donau": "合并进 `-R`", "local": "忽略"}
+    },
+    "time": {
+      "description": "运行时限；`HH:MM:SS`，Donau 另接受 `MM:SS` 与纯秒",
+      "example": "time=01:00:00",
+      "backends": {"slurm": "`--time`", "donau": "`-T`（可转秒）", "local": "忽略"}
+    },
+    "memory": {
+      "description": "内存需求",
+      "example": "memory=16G",
+      "backends": {"slurm": "`--mem`", "donau": "合并进 `-R`", "local": "忽略"}
+    },
+    "exclusive": {
+      "description": "独占节点访问",
+      "example": "exclusive",
+      "backends": {"slurm": "`--exclusive`", "donau": "`--exclusive`", "local": "忽略"}
+    },
+    "nodelist": {
+      "description": "指定节点列表",
+      "example": "nodelist=node[01-04]",
+      "backends": {"slurm": "`--nodelist`", "donau": "`-pn`", "local": "忽略"}
+    },
+    "output": {
+      "description": "标准输出文件",
+      "example": "output=job.out",
+      "backends": {"slurm": "`--output`", "donau": "`-oo`", "local": "由后端重定向 stdout"}
+    },
+    "error": {
+      "description": "标准错误文件；未设置时 stderr 并入 `output`",
+      "example": "error=job.err",
+      "backends": {"slurm": "`--error`", "donau": "`-eo`", "local": "由后端重定向 stderr"}
+    },
+    "account": {
+      "description": "计费账户",
+      "example": "account=proj01",
+      "backends": {"slurm": "`--account`", "donau": "`-A`", "local": "忽略"}
+    },
+    "dependency": {
+      "description": "作业依赖表达式",
+      "example": "dependency=afterok:12345",
+      "backends": {"slurm": "`--dependency`", "donau": "**忽略**", "local": "忽略"}
+    },
+    "job-type": {
+      "description": "调度器作业类型（仅 Donau 使用）",
+      "example": "job-type=cosched",
+      "backends": {"slurm": "**忽略**", "donau": "`--job_type`", "local": "忽略"}
+    },
+    "requeue": {
+      "description": "是否允许调度器自动重排队；仅 `false` 时 SLURM 生成 `--no-requeue`",
+      "example": "requeue=false",
+      "backends": {"slurm": "`false` → `--no-requeue`", "donau": "**忽略**", "local": "忽略"}
+    },
+    "project": {
+      "description": "项目任务号，由 HPC 管理员提供",
+      "example": "project=105-01-01",
+      "backends": {"slurm": "`--wckey`", "donau": "合并进 `-d`", "local": "忽略"}
+    },
+    "application": {
+      "description": "应用名称，由 HPC 管理员提供；可用 `modelname` 查看可选值",
+      "example": "application=MCV",
+      "backends": {"slurm": "`--comment`", "donau": "合并进 `-d`", "local": "忽略"}
+    }
+  }
+}

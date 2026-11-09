@@ -42,7 +42,9 @@
 
 ### 5. 文档（本仓库）
 
-- `docs/source/reference/directives.md`：指令全集表格与后端支持矩阵各加一行；
+- `docs/data/directives.json`：为新键补中文说明、示例、三后端摘要，并把它加入合适的分组；
+- 运行 `make docs-directives` 重新生成 `reference/directives.md` 的分组表与后端支持矩阵
+  （生成产物随同一 commit 提交；未同步数据文件时生成脚本会直接报错）；
 - `docs/source/reference/scheduler-mapping.md`：各后端映射表加一行（或注明忽略）。
 
 同时检查相关指南页是否需要同步：新键若有使用场景或易错写法，更新
