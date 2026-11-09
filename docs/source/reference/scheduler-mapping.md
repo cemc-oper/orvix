@@ -110,8 +110,8 @@
 
 归一化前的预处理两后端不同：
 
-- **SLURM**：大写化并去首尾空白，再取空格前的首个词——因此 sacct 的
-  `CANCELLED by 30255` 归一化为 `CANCELLED`。
+- **SLURM**：大写化并去首尾空白，取空白前的首个词，再去掉词尾的 `+` / `~` 后缀——因此
+  sacct 的 `CANCELLED by 30255` 与 SLURM 20.11 的 `CANCELLED+` 都归一化为 `CANCELLED`。
 - **Donau**：仅大写化，不做去空白与取首词。
 - SLURM 的 `squeue` 与 `sacct` 都查不到内容时原始状态为空串，归一化结果为 `UNKNOWN`。
 

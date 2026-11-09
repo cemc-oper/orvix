@@ -18,7 +18,8 @@ orvix status --format json myjob.sh.info.yaml    # 原始 + 归一化状态
   `UNKNOWN`（常见于作业号很旧、记账已清理的情况）。
 - **local 只有两种状态**：`RUNNING` 与 `FINISHED`，归一化后分别是 `RUNNING` 与
   `COMPLETED`，无法反映脚本是否成功。
-- 状态字符串里的限定后缀（如 sacct 的 `CANCELLED by 30255`）在 SLURM 归一化时只取首个词。
+- 状态字符串里的限定后缀（如 sacct 的 `CANCELLED by 30255`、SLURM 20.11 的 `CANCELLED+`）
+  在 SLURM 归一化时只取状态名本身。
 
 ## 持续监视
 

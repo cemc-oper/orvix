@@ -255,6 +255,13 @@ func TestSlurmNormalizeState(t *testing.T) {
 		{"cancelled by 30255", StateCancelled},
 		{"TIMEOUT by 30255", StateTimeout},
 		{"  COMPLETED  ", StateCompleted},
+		// sacct may append a '+'/'~' suffix (SLURM 20.11 reports CANCELLED+
+		// for jobs cancelled through scancel).
+		{"CANCELLED+", StateCancelled},
+		{"cancelled+", StateCancelled},
+		{"CANCELLED~", StateCancelled},
+		{"CANCELLED+ ", StateCancelled},
+		{"CANCELLED+ by 30255", StateCancelled},
 	}
 	for _, c := range cases {
 		assert.Equal(t, c.want, s.NormalizeState(c.raw), "raw=%q", c.raw)

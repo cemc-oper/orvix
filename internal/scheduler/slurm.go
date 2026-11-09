@@ -300,9 +300,13 @@ func (s *SLURM) NormalizeState(raw string) JobState {
 	state := strings.ToUpper(strings.TrimSpace(raw))
 	// sacct may qualify terminal states, e.g. "CANCELLED by 30255" — keep
 	// only the leading state token.
-	if i := strings.IndexByte(state, ' '); i > 0 {
+	if i := strings.IndexAny(state, " \t"); i > 0 {
 		state = state[:i]
 	}
+	// sacct also suffixes some states, e.g. "CANCELLED+" for jobs cancelled
+	// via scancel on SLURM 20.11. The suffix is not part of the state name;
+	// keeping it would normalize to UNKNOWN and watch would never finish.
+	state = strings.TrimRight(state, "+~")
 	switch state {
 	case "RUNNING":
 		return StateRunning
