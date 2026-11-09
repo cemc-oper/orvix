@@ -36,4 +36,9 @@ orvix 文档
    :maxdepth: 2
    :caption: 参考
 
+   reference/directives
+   reference/cli
+   reference/scheduler-mapping
+   reference/file-formats
+   reference/configuration
    reference/jobspec
