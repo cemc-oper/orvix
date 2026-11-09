@@ -1,7 +1,9 @@
 # orvix
 
 ![Maturity-Sandbox](https://img.shields.io/badge/Maturity-Sandbox-F9D71C)
+[![GitHub Release](https://img.shields.io/github/v/release/cemc-oper/orvix)](https://github.com/cemc-oper/orvix/releases/latest)
 [![ci](https://github.com/cemc-oper/orvix/actions/workflows/ci.yml/badge.svg)](https://github.com/cemc-oper/orvix/actions/workflows/ci.yml)
+[![Documentation Status](https://app.readthedocs.org/projects/orvix/badge/?version=latest)](https://orvix.readthedocs.io/zh-cn/latest/?badge=latest)
 
 orvix 是一个用于向 HPC 集群提交脚本作业的命令行工具。
 
