@@ -6,43 +6,22 @@
 orvix 是一个用于向 HPC 集群提交脚本作业的命令行工具。
 
 只需在脚本头部使用统一的 `#ORVIX key=value` 语法编写资源需求，orvix 会自动将其转换为目标调度器
-（SLURM / 华为 Donau / 本地运行）的指令并提交作业。
+（SLURM / 华为 Donau / 本地运行）的指令并提交作业，同时提供状态查询、监视与终止等完整的作业生命周期命令。
 
 完整文档见 **[orvix.readthedocs.io](https://orvix.readthedocs.io/)**。
 
 ## 安装
 
-### 下载预编译二进制（推荐）
-
-从 [GitHub Releases](https://github.com/cemc-oper/orvix/releases) 下载对应平台的压缩包，
-解压后将 `orvix` 放入 `PATH` 即可。所有发布产物均为 CGO 关闭的全静态二进制，
-可在老版本 glibc 的 HPC 上直接运行。
+从 [GitHub Releases](https://github.com/cemc-oper/orvix/releases) 下载预编译二进制，
+解压后放入 `PATH`（CGO 关闭的全静态二进制，可在老版本 glibc 的 HPC 上直接运行）：
 
 ```bash
-# 例如 Linux AMD64
 tar -xzf orvix_<version>_linux_amd64.tar.gz
 install -m 755 orvix /path/to/bin/
 ```
 
-### 使用 go install
-
-```bash
-go install github.com/cemc-oper/orvix@v<version>
-```
-
-### 从源码构建
-
-```bash
-make build              # 生成 bin/orvix
-```
-
-在没有网络的 HPC 上，可在有网络的机器上交叉编译后上传（CGO 关闭，全静态二进制）：
-
-```bash
-make build-linux-amd64  # Linux AMD64
-make build-linux-arm64  # Linux ARM64
-scp bin/orvix-linux-amd64 user@hpc:/path/to/orvix
-```
+也可以使用 `go install github.com/cemc-oper/orvix@v<version>`，或从源码 `make build`。
+离线 HPC 的交叉编译、校验与升级说明见在线文档的「开始 → 安装」。
 
 ## 快速开始
 
@@ -77,9 +56,17 @@ orvix status myjob.sh.info.yaml  # 查询作业状态
 orvix kill myjob.sh.info.yaml    # 终止作业
 ```
 
+没有集群也能试：把 `scheduler` 写成 `local`，即可在本机跑通完整流程。
+
 ## 文档
 
 在线文档：<https://orvix.readthedocs.io/>
+
+- **开始** — 简介与核心概念、安装、快速上手（用 `local` 后端，无需 HPC）
+- **指南** — 编写作业脚本、选择后端、提交与脚本化、监视与终止、产物管理、
+  ecFlow 集成、被工作流生成器使用、故障排查
+- **开发** — 环境搭建、架构、测试策略、新增指令、新增后端、发布流程、文档编写
+- **参考** — 指令全集、命令与退出码、调度器映射与状态、文件格式、环境变量、jobspec 契约
 
 本地构建文档：
 
@@ -88,12 +75,15 @@ pip install -r docs/requirements.txt
 cd docs && make html           # 输出到 docs/build/html/
 ```
 
-文档内容概览：
+## 开发
 
-- **快速上手** — 安装与第一个作业
-- **使用指南** — `#ORVIX` 指令参考、命令参考、生成的文件、调度器后端与指令映射
-- **参考** — jobspec 契约（本仓库权威持有，takflow vendor 消费）
-- **开发** — 架构说明、新增指令清单
+```bash
+make build       # 生成 bin/orvix
+make test        # 单元测试
+make vet         # go vet
+```
+
+贡献者请从文档的「开发」部分读起；修改用户可见行为时需在同一个 PR 更新对应文档页。
 
 ## 许可证
 
