@@ -11,48 +11,14 @@ orvix 文档
 精确定义在「参考」。
 
 .. 文档站分为四区：开始 → 指南 → 开发 → 参考。
+   顶层只列四个区的落地页，各区子页面在该区 index 的 toctree 中，
+   避免侧边栏把全部页面平铺展开。
    页面归属与写作约定见 develop/documentation。
 
 .. toctree::
    :maxdepth: 2
-   :caption: 开始
 
-   start/introduction
-   start/installation
-   start/quickstart
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 指南
-
-   guide/writing-scripts
-   guide/choosing-scheduler
-   guide/running-jobs
-   guide/monitoring-and-killing
-   guide/output-files
-   guide/ecflow
-   guide/workflow-generators
-   guide/troubleshooting
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 开发
-
-   develop/setup
-   develop/architecture
-   develop/testing
-   develop/adding-directive
-   develop/adding-scheduler
-   develop/releasing
-   develop/documentation
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 参考
-
-   reference/directives
-   reference/cli
-   reference/scheduler-mapping
-   reference/file-formats
-   reference/configuration
-   reference/jobspec
+   start/index
+   guide/index
+   develop/index
+   reference/index
