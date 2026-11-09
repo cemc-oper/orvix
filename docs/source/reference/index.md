@@ -3,6 +3,7 @@
 面向查找的精确定义：指令键、命令选项、调度器映射、状态与文件格式。
 
 ```{toctree}
+:hidden:
 :maxdepth: 2
 
 directives

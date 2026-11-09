@@ -3,6 +3,7 @@
 修改 orvix 本身所需的材料。改内部实现前先读架构说明，改用户可见行为时请同步更新文档。
 
 ```{toctree}
+:hidden:
 :maxdepth: 2
 
 setup

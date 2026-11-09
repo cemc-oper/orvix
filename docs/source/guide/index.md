@@ -3,6 +3,7 @@
 日常使用 orvix 的操作指引，按任务组织。指令、命令、状态的精确表格在「参考」区。
 
 ```{toctree}
+:hidden:
 :maxdepth: 2
 
 writing-scripts

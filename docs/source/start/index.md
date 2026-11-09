@@ -4,6 +4,7 @@
 （教程用 `local` 后端，不需要 HPC）。
 
 ```{toctree}
+:hidden:
 :maxdepth: 2
 
 introduction
