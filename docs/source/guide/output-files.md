@@ -1,90 +1,67 @@
-# 生成的文件
+# 生成的文件与管理
 
-orvix 在脚本**同一目录**下生成若干附属文件。重新提交会覆盖同名现有文件。
+orvix 默认把附属文件写在原脚本**同一目录**。本页讲这些文件怎么用、怎么管；
+字段与格式的精确定义见 [文件格式](../reference/file-formats.md)。
 
-## orvix submit 生成的文件
-
-```
-path/to/script.sh              # 原始脚本（不变）
-path/to/script.sh.submit       # 实际执行的翻译后脚本
-path/to/script.sh.info.yaml    # 作业元数据（status / watch / kill 的输入）
-path/to/script.sh.submit.log   # 提交日志
-```
-
-- 提交成功时，生成 `.submit`、`.info.yaml` 和 `.submit.log`。
-- 提交失败时（如解析错误、调度器拒绝），仍生成 `.submit.log`，记录错误和时间戳。
-- 使用 `--no-log` 可关闭 `.submit.log` 的生成（成功和失败均不生成）。
-- `--output-script` / `--output-info` 可自定义前两个文件的路径。
-
-## orvix generate 生成的文件
-
-`orvix generate` 仅生成 `.submit` 文件，**不**生成 `.info.yaml` 和 `.submit.log`：
+## 产物速览
 
 ```
-path/to/script.sh              # 原始脚本（不变）
-path/to/script.sh.submit       # 翻译后的脚本
+myjob.sh              原始脚本（orvix 不修改）
+myjob.sh.submit       翻译后的脚本，实际被调度器/本地执行
+myjob.sh.info.yaml    作业元数据，status / watch / kill 的输入
+myjob.sh.submit.log   提交日志（成功与失败都写）
 ```
 
-## .submit 脚本
+- `generate` 只写 `.submit`（失败时仍会写 `.submit.log`）。
+- `submit` 成功时三个都写；提交失败时 `.submit` 已存在，`.info.yaml` 还没有。
+- `--no-log` 关闭 `.submit.log`；`--dry-run` 不落任何文件。
+- 各场景的完整对照表见 [文件格式](../reference/file-formats.md)。
 
-翻译后的可执行脚本（权限 0755）：
+## 日常怎么用
 
-- 保留原脚本的 shebang；
-- 紧随其後插入调度器指令块（如 `#SBATCH` / `#DSUB` 行）；
-- 删除所有 `#ORVIX` 行；
-- 其余内容原样保留。
+**`.submit`：确认翻译结果。** 提交被拒或资源不符预期时先看它，例如检查 `#SBATCH --partition`
+是否真的是你想要的队列、有没有空旗标。
 
-## .info.yaml
+**`.info.yaml`：作业的句柄。** 后续所有操作都以它为参数，不要删、不要改名；
+它也记录了生效的指令列表，可用于追溯某次提交到底用了什么资源。
 
-作业元数据 sidecar，`status` / `watch` / `kill` 命令通过它找到作业：
+**`.submit.log`：排错第一站。** `[submit-cmd]` 是实际执行的调度器命令，`[output]`
+是调度器返回的作业号或错误信息。
 
-```yaml
-version: v1.2.3
-scheduler: slurm
-job_id: "12345678"
-submitted_at: 2026-05-10T11:27:22.107722252Z
-script_source: /abs/path/script.sh
-script_generated: /abs/path/script.sh.submit
-submit_dir: /abs/path
-hostname: login01
-user: wangdp
-submit_command: sbatch --parsable /abs/path/script.sh.submit
-directives:
-    - key: scheduler
-      value: slurm
-    - key: queue
-      value: normal
-    - key: nodes
-      value: "2"
+## 覆盖与并发
+
+- 重复提交同一脚本会**覆盖**同名 `.submit`、`.info.yaml`、`.submit.log`，
+  旧作业号随之丢失；旧作业本身仍在集群上，需要时可从集群侧用作业号管理。
+- 同一脚本**并发提交多份**时产物会互相覆盖。需要并行多实例时，给每份实例独立的
+  输出路径，或把脚本复制到各自目录：
+
+```bash
+orvix submit myjob.sh \
+  --output-script runs/exp01/myjob.submit \
+  --output-info   runs/exp01/myjob.info.yaml
 ```
 
-字段说明：
+- `.submit.log` 路径固定为 `<脚本>.submit.log`，无法按实例区分，并发时以最新一次为准。
 
-| 字段 | 说明 |
-|---|---|
-| `version` | 提交时使用的 orvix 版本 |
-| `scheduler` | 实际使用的调度器后端 |
-| `job_id` | 调度器返回的作业 ID（local 后端为进程 PID） |
-| `submitted_at` | 提交时间（RFC3339） |
-| `script_source` | 原始脚本绝对路径 |
-| `script_generated` | 翻译后脚本绝对路径 |
-| `submit_dir` | 提交时的工作目录 |
-| `hostname` / `user` | 提交主机与用户名 |
-| `submit_command` | 实际执行的提交命令 |
-| `directives` | 解析后的全部 `#ORVIX` 指令（含条件指令的 `condition` 字段），用于追溯 |
+## 清理与归档
 
-## .submit.log
+- 作业结束后，`.submit` 与 `.submit.log` 可以安全删除；**`.info.yaml` 建议保留到
+  你确定不再需要查状态或终止该作业为止**。
+- 需要审计或复盘时，把 `.info.yaml` 与 `.submit.log` 随作业输出一起归档——它们记录了
+  orvix 版本、提交命令、提交主机与生效指令。
+- 在 ecFlow 流程中这些文件位于 `%ECF_HOME%` 下的任务工作目录，通常随流程的
+  housekeep 一起清理；清理前确认对应任务不再需要 kill。
 
-提交日志，成功与失败格式相同，仅状态标签不同：
+## 文件丢失的后果
 
-```
-[2026-05-10T11:27:22+08:00] status: SUCCESS
+| 丢失文件 | 影响 | 处置 |
+|---|---|---|
+| `.info.yaml` | `status` / `watch` / `kill` 全部无法使用 | 用调度器原生命令按作业号处理；下次提交会重新生成 |
+| `.submit` | 无法核对翻译结果，正在运行的作业不受影响 | 用 `orvix generate` 重新生成 |
+| `.submit.log` | 失去提交期错误记录 | 重新提交或用 `--debug` 重放 |
 
-[submit-cmd]
-sbatch --parsable /abs/path/script.sh.submit
+## 相关页面
 
-[output]
-12345678
-```
-
-失败时标签为 `ERROR: orvix submit failed`，`[output]` 段记录错误信息。
+- [文件格式](../reference/file-formats.md)
+- [提交与运行作业](running-jobs.md)
+- [故障排查](troubleshooting.md)

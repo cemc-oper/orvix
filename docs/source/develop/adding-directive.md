@@ -42,8 +42,8 @@
 
 ### 5. 文档（本仓库）
 
-- `docs/source/guide/directives.md`：指令全集表格加一行；
-- `docs/source/guide/schedulers.md`：各后端映射表加一行（或注明忽略）。
+- `docs/source/reference/directives.md`：指令全集表格与后端支持矩阵各加一行；
+- `docs/source/reference/scheduler-mapping.md`：各后端映射表加一行（或注明忽略）。
 
 ### 6. 通知消费方（takflow 仓库）
 

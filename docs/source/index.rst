@@ -25,10 +25,14 @@ orvix 文档
    :maxdepth: 2
    :caption: 指南
 
-   guide/directives
-   guide/commands
+   guide/writing-scripts
+   guide/choosing-scheduler
+   guide/running-jobs
+   guide/monitoring-and-killing
    guide/output-files
-   guide/schedulers
+   guide/ecflow
+   guide/workflow-generators
+   guide/troubleshooting
 
 .. toctree::
    :maxdepth: 2
